@@ -5,6 +5,7 @@ const dotenv = require('dotenv');
 
 class MpesaService {
   constructor() {
+    this.refreshRuntimeConfig();
     this.consumerKey = String(process.env.MPESA_CONSUMER_KEY || '').trim();
     this.consumerSecret = String(process.env.MPESA_CONSUMER_SECRET || '').trim();
     this.environment = this.normalizeEnvironment(process.env.MPESA_ENVIRONMENT || 'production');
@@ -48,7 +49,7 @@ class MpesaService {
     ];
 
     for (const envPath of envPaths) {
-      dotenv.config({ path: envPath, override: true });
+      dotenv.config({ path: envPath, override: false });
     }
 
     const latestShortcode = String(process.env.MPESA_SHORTCODE || '').trim();

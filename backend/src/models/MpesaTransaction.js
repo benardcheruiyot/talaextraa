@@ -1,6 +1,44 @@
-﻿const transactions = new Map();
+﻿const fs = require('fs');
+const path = require('path');
+
+const STORE_DIR = process.env.TALA_EXTRA_MODEL_STORE_DIR || path.resolve(__dirname, '../../data');
+const STORE_FILE = path.join(STORE_DIR, 'mpesa-transactions.json');
 const PENDING_EXPIRY_MS = 5 * 60 * 1000;
 const TERMINAL_RETENTION_MS = 30 * 60 * 1000;
+
+const ensureStore = () => {
+  fs.mkdirSync(STORE_DIR, { recursive: true });
+  if (!fs.existsSync(STORE_FILE)) {
+    fs.writeFileSync(STORE_FILE, JSON.stringify({ transactions: [] }, null, 2));
+  }
+};
+
+const readStore = () => {
+  ensureStore();
+  const raw = fs.readFileSync(STORE_FILE, 'utf8');
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed.transactions) ? parsed.transactions : [];
+  } catch {
+    return [];
+  }
+};
+
+const writeStore = (transactions) => {
+  ensureStore();
+  fs.writeFileSync(STORE_FILE, JSON.stringify({ transactions }, null, 2));
+};
+
+const transactionList = () => {
+  return readStore().map((transaction) => ({
+    ...transaction,
+    createdAt: transaction.createdAt ? new Date(transaction.createdAt) : new Date(),
+    updatedAt: transaction.updatedAt ? new Date(transaction.updatedAt) : new Date(),
+    completedAt: transaction.completedAt ? new Date(transaction.completedAt) : null,
+    loanCreatedAt: transaction.loanCreatedAt ? new Date(transaction.loanCreatedAt) : null,
+    expiresAt: transaction.expiresAt ? new Date(transaction.expiresAt) : new Date(),
+  }));
+};
 
 class MpesaTransaction {
   constructor(data) {
@@ -31,10 +69,11 @@ class MpesaTransaction {
 
   static purgeStaleTransactions() {
     const now = Date.now();
+    const transactions = transactionList();
+    const activeTransactions = [];
 
-    for (const [checkoutRequestId, transaction] of transactions.entries()) {
+    for (const transaction of transactions) {
       if (!transaction) {
-        transactions.delete(checkoutRequestId);
         continue;
       }
 
@@ -45,10 +84,14 @@ class MpesaTransaction {
           : new Date(transaction.updatedAt || transaction.createdAt).getTime();
 
         if (now - terminalAt > TERMINAL_RETENTION_MS) {
-          transactions.delete(checkoutRequestId);
+          continue;
         }
       }
+
+      activeTransactions.push(transaction);
     }
+
+    writeStore(activeTransactions);
   }
 
   static expireIfPending(transaction) {
@@ -79,7 +122,9 @@ class MpesaTransaction {
       id: `MPESA-${Date.now()}`,
     });
 
-    transactions.set(transaction.checkoutRequestId, transaction);
+    const transactions = transactionList();
+    transactions.push(transaction);
+    writeStore(transactions);
     return transaction;
   }
 
@@ -87,38 +132,41 @@ class MpesaTransaction {
     if (!checkoutRequestId) return null;
     MpesaTransaction.purgeStaleTransactions();
 
-    const transaction = transactions.get(checkoutRequestId) || null;
-    return MpesaTransaction.expireIfPending(transaction);
+    const transaction = transactionList().find((item) => item.checkoutRequestId === checkoutRequestId) || null;
+    return transaction ? MpesaTransaction.expireIfPending(transaction) : null;
   }
 
   static async updateByCheckoutRequestId(checkoutRequestId, patch) {
     MpesaTransaction.purgeStaleTransactions();
 
-    const transaction = await MpesaTransaction.findByCheckoutRequestId(checkoutRequestId);
-    if (!transaction) return null;
+    const transactions = transactionList();
+    const target = transactions.find((item) => item.checkoutRequestId === checkoutRequestId);
+    if (!target) return null;
 
-    if (transaction.status === 'expired') {
-      return transaction;
+    if (target.status === 'expired') {
+      return target;
     }
 
-    Object.assign(transaction, patch);
-    transaction.updatedAt = new Date();
+    Object.assign(target, patch);
+    target.updatedAt = new Date();
 
     if (patch.status && ['completed', 'failed', 'cancelled', 'expired'].includes(patch.status)) {
-      transaction.completedAt = new Date();
+      target.completedAt = new Date();
     }
 
-    return transaction;
+    writeStore(transactions);
+    return target;
   }
 
   static async findLastByUserId(userId) {
     if (!userId) return null;
     MpesaTransaction.purgeStaleTransactions();
 
+    const transactions = transactionList();
     let lastTransaction = null;
     let latestTime = 0;
 
-    for (const transaction of transactions.values()) {
+    for (const transaction of transactions) {
       if (transaction && transaction.userId === userId) {
         const txTime = new Date(transaction.createdAt).getTime();
         if (txTime > latestTime) {
@@ -135,14 +183,8 @@ class MpesaTransaction {
     if (!userId) return [];
     MpesaTransaction.purgeStaleTransactions();
 
-    const userTransactions = [];
-    for (const transaction of transactions.values()) {
-      if (transaction && transaction.userId === userId) {
-        userTransactions.push(MpesaTransaction.expireIfPending(transaction));
-      }
-    }
+    const userTransactions = transactionList().filter((transaction) => transaction && transaction.userId === userId);
 
-    // Sort by creation date, newest first
     return userTransactions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   }
 }
