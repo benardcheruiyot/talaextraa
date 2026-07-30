@@ -29,6 +29,10 @@ describe('MpesaService environment handling', () => {
     expect(mpesaService.normalizePhone('0112345678')).toBe('254112345678');
   });
 
+  test('normalizes newer Safaricom numbers starting with 014', () => {
+    expect(mpesaService.normalizePhone('0141234567')).toBe('254141234567');
+  });
+
   test('normalizes 07-prefixed numbers to 254 format', () => {
     expect(mpesaService.normalizePhone('0712345678')).toBe('254712345678');
   });

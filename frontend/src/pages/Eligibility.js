@@ -8,13 +8,16 @@ import Swal from 'sweetalert2';
 import './Eligibility.css';
 
 const nameRegex = /^[a-zA-Z]{2,}([ '-][a-zA-Z]{2,})+$/;
-const phoneRegex = /^(?:\+?254|0)(7(?:[0-2]\d|4[0-3]|45|46|48|5[7-9]|6[89]|9\d)|11[0-9])\d{6}$/;
+const phoneRegex = /^(?:\+?254|0)(?:7(?:[0-2]\d|4[0-3]|45|46|48|5[7-9]|6[89]|9\d)|11[0-9]|14[0-9])\d{6}$/;
 const idRegex = /^[0-9]{7,8}$/;
 
 function normalizePhone(raw) {
   let p = raw.replace(/[\s\-().]/g, '');
   if (p.startsWith('+254')) return '0' + p.slice(4);
   if (p.startsWith('254')) return '0' + p.slice(3);
+  if (p.startsWith('0') && p.length === 10) return p;
+  if (p.startsWith('1') && p.length === 10) return '0' + p;
+  if (p.startsWith('7') && p.length === 9) return '0' + p;
   return p;
 }
 
@@ -30,7 +33,7 @@ const Eligibility = () => {
   });
   const [fieldState, setFieldState] = useState({
     name: { state: null, msg: 'Enter your full name as on your national ID' },
-    phone_number: { state: null, msg: 'Safaricom only \u2014 e.g. 0712 345 678 or 0110 123 456' },
+    phone_number: { state: null, msg: 'Safaricom only — e.g. 0712 345 678, 0110 123 456 or 0140 123 456' },
     national_id: { state: null, msg: '7 or 8 digit Kenyan National ID number' },
     loan_type: { state: null, msg: 'Choose the purpose of your loan' },
   });
@@ -51,7 +54,7 @@ const Eligibility = () => {
     if (!raw) return { state: null, msg: 'Safaricom only \u2014 e.g. 0712 345 678 or 0110 123 456' };
     const v = normalizePhone(raw);
     if (v.length < 10) return { state: 'invalid', msg: 'Too short \u2014 Safaricom numbers are 10 digits' };
-    if (!phoneRegex.test(v)) return { state: 'invalid', msg: 'Not a Safaricom number \u2014 valid prefixes: 07[0-2]x, 074x, 079x, 011x' };
+    if (!phoneRegex.test(v)) return { state: 'invalid', msg: 'Not a Safaricom number — valid prefixes: 07[0-2]x, 074x, 079x, 011x, 014x' };
     return { state: 'valid', msg: '\u2713 Valid Safaricom number' };
   };
 
@@ -96,7 +99,7 @@ const Eligibility = () => {
     if (!phoneRegex.test(phone)) {
       return Swal.fire({
         icon: 'error', title: 'Safaricom Number Required',
-        html: '<p>Only Safaricom numbers are accepted.</p><p style="margin-top:8px;font-size:0.9rem;color:#555;">Valid formats:</p><ul style="text-align:left;margin-top:4px;font-size:0.9rem;"><li>0712 345 678</li><li>0722 345 678</li><li>0110 123 456</li></ul>',
+        html: '<p>Only Safaricom numbers are accepted.</p><p style="margin-top:8px;font-size:0.9rem;color:#555;">Valid formats:</p><ul style="text-align:left;margin-top:4px;font-size:0.9rem;"><li>0712 345 678</li><li>0722 345 678</li><li>0110 123 456</li><li>0140 123 456</li></ul>',
         confirmButtonColor: '#26c2a3'
       });
     }

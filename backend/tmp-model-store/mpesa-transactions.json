@@ -1,0 +1,29 @@
+{
+  "transactions": [
+    {
+      "id": "MPESA-1785437936106",
+      "checkoutRequestId": "TX-123",
+      "merchantRequestId": null,
+      "phone": "0712345678",
+      "userId": "user-1",
+      "loanAmount": null,
+      "termDays": 60,
+      "amount": 120,
+      "accountReference": null,
+      "status": "initiated",
+      "resultCode": null,
+      "resultDescription": null,
+      "mpesaReceiptNumber": null,
+      "callbackData": null,
+      "loanId": null,
+      "loanCreatedAt": null,
+      "rawRequest": null,
+      "rawResponse": null,
+      "lastStatusQueryAt": null,
+      "createdAt": "2026-07-30T18:58:56.106Z",
+      "updatedAt": "2026-07-30T18:58:56.106Z",
+      "completedAt": null,
+      "expiresAt": "2026-07-30T19:03:56.106Z"
+    }
+  ]
+}
