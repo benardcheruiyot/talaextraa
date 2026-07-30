@@ -1,4 +1,4 @@
-const transactions = new Map();
+﻿const transactions = new Map();
 const PENDING_EXPIRY_MS = 5 * 60 * 1000;
 const TERMINAL_RETENTION_MS = 30 * 60 * 1000;
 

@@ -5,10 +5,10 @@ import './Processing.css';
 const messages = [
   'Initializing secure connection...',
   'Verifying your details...',
-  'Checking credit profile...',
-  'Contacting verification services...',
-  'Calculating loan offer...',
-  'Finalizing approval...',
+  'Reviewing the information provided...',
+  'Checking the requested details...',
+  'Preparing the next step...',
+  'Finalizing your request...',
 ];
 
 const Processing = () => {
@@ -98,15 +98,15 @@ const Processing = () => {
 
         <div className="processing-trust-grid">
           <div className="processing-trust-item">🏦 CBK Licensed</div>
-          <div className="processing-trust-item">⏱️ Instant Approval</div>
+          <div className="processing-trust-item">📝 Application Review</div>
           <div className="processing-trust-item">🔐 Data Protected</div>
-          <div className="processing-trust-item">💳 No Hidden Fees</div>
+          <div className="processing-trust-item">💳 Clear Fees</div>
         </div>
 
         {showResult && (
           <div className="processing-success">
             <div className="processing-success-check">✔</div>
-            <p>Eligibility successful. You qualify for a loan.</p>
+            <p>Your application has been received. Our team will review it and contact you with the next step.</p>
           </div>
         )}
       </div>

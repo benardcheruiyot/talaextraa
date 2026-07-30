@@ -57,10 +57,10 @@ const Home = () => {
             >
               <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
             </svg>
-            Special Offer
+            Loan Information
           </div>
-          <h1>Get Up To Ksh 150,000</h1>
-          <p>Low 7.5% interest rate for qualified borrowers</p>
+          <h1>Explore Loan Options</h1>
+          <p>Review available terms, fees, and eligibility details before you apply.</p>
         </div>
 
         <div className="progress-steps">
@@ -70,11 +70,11 @@ const Home = () => {
           </div>
           <div className="step">
             <div className="step-number">2</div>
-            <div className="step-label">Approve</div>
+            <div className="step-label">Review</div>
           </div>
           <div className="step">
             <div className="step-number">3</div>
-            <div className="step-label">Receive</div>
+            <div className="step-label">Outcome</div>
           </div>
         </div>
 
@@ -85,7 +85,7 @@ const Home = () => {
           disabled={isNavigating}
           aria-busy={isNavigating}
         >
-          <span>Apply Now</span>
+          <span>Check Eligibility</span>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="18"
@@ -110,9 +110,9 @@ const Home = () => {
                 <polyline points="12 6 12 12 16 14"></polyline>
               </svg>
             </div>
-            Quick Approval
+            Simple Application
           </div>
-          <p>Get pre-approved in minutes with our streamlined digital process.</p>
+          <p>Complete the form and review the available options at your own pace.</p>
         </div>
 
         <div className="card">
@@ -135,9 +135,9 @@ const Home = () => {
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
               </svg>
             </div>
-            No Hidden Fees
+            Clear Terms
           </div>
-          <p>Transparent pricing with no surprises. Know exactly what you'll pay.</p>
+          <p>Review the fees, repayment terms, and eligibility requirements before you continue.</p>
         </div>
 
         <div className="trust-badges">

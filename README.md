@@ -219,15 +219,33 @@ npm test           # Run tests
 
 ## 🚀 Deployment
 
-### Backend
-- Can be deployed to Heroku, AWS, DigitalOcean, etc.
-- Uses environment variables for configuration
-- Ensure M-Pesa callback URL is configured
+### Frontend on Vercel
+1. Connect the frontend folder to Vercel.
+2. Set the environment variable:
+   - `REACT_APP_API_URL=https://YOUR_RENDER_BACKEND_URL/api`
+3. Deploy.
 
-### Frontend
-- Can be deployed to InterServer, Netlify, AWS S3 + CloudFront, etc.
-- Build with `npm run build`
-- Update `REACT_APP_API_URL` for production API endpoint
+### Backend on Render
+1. Connect the repo root to Render.
+2. Use the included render.yaml file.
+3. Set the required environment variables in Render:
+   - `NODE_ENV=production`
+   - `PORT=10000`
+   - `JWT_SECRET=your_secret`
+   - `ALLOWED_ORIGINS=https://YOUR_VERCEL_FRONTEND_URL`
+   - `FRONTEND_URL=https://YOUR_VERCEL_FRONTEND_URL`
+   - `MPESA_CONSUMER_KEY=...`
+   - `MPESA_CONSUMER_SECRET=...`
+   - `MPESA_SHORTCODE=...`
+   - `MPESA_PARTYB=...`
+   - `MPESA_PASSKEY=...`
+   - `MPESA_ENVIRONMENT=production`
+   - `MPESA_TRANSACTION_TYPE=CustomerBuyGoodsOnline`
+
+### Important notes
+- The frontend can proxy API calls to the Render backend through the configured route.
+- For local development, the frontend still uses `http://localhost:5000/api`.
+- The backend health endpoint is available at `/api/health`.
 
 ### CI/CD
 

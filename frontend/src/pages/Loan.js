@@ -525,7 +525,7 @@ const Loan = () => {
         <div className="loan-content card">
           <div className="loan-topbar">
             <div className="loan-topbar-copy">
-              <span className="loan-eyebrow">Fast loan approval</span>
+              <span className="loan-eyebrow">Application review</span>
               <h1>Select a loan amount</h1>
               <p className="apply-subtitle">
                 Pick one offer to continue. You will confirm details before any M-Pesa payment prompt is sent.
@@ -550,8 +550,8 @@ const Loan = () => {
           </div>
 
           <div className="qualification-box">
-            Hi <strong>{user?.name || 'Customer'}</strong>, you qualify for these loan options based on your
-            <strong> M-Pesa records</strong>. Select one amount to continue.
+            Hi <strong>{user?.name || 'Customer'}</strong>, based on the information provided, you can review
+            <strong> available loan options</strong>. Select one amount to continue.
           </div>
 
           <div className="amounts-panel">

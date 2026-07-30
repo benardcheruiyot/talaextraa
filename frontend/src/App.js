@@ -11,6 +11,9 @@ import Eligibility from './pages/Eligibility';
 import Loan from './pages/Loan';
 import LoanProcessing from './pages/LoanProcessing';
 import Processing from './pages/Processing';
+import Privacy from './pages/Privacy';
+import Terms from './pages/Terms';
+import Contact from './pages/Contact';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function PushSubscriber() {
@@ -71,6 +74,10 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
+
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/contact" element={<Contact />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

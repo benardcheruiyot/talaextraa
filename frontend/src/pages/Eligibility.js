@@ -279,7 +279,7 @@ const Eligibility = () => {
                     <polyline points="20 6 9 17 4 12"></polyline>
                   </svg>
                 </div>
-                <div className="trust-text">No CRB Check</div>
+                <div className="trust-text">Eligibility Review</div>
               </div>
             </div>
 

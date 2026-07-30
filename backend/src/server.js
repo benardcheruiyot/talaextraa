@@ -1,5 +1,4 @@
 require('dotenv').config();
-console.log('ALLOWED_ORIGINS:', process.env.ALLOWED_ORIGINS);
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -18,10 +17,6 @@ app.set('trust proxy', 1);
 app.use(helmet());
 
 // CORS configuration (Best Practice + Enhanced Logging)
-
-
-
-// Reusable CORS config utility
 const corsConfig = require('./utils/corsConfig');
 
 // Log every incoming request's Origin header
@@ -31,8 +26,6 @@ app.use((req, res, next) => {
   }
   next();
 });
-
-
 
 app.use(cors(corsConfig));
 
@@ -63,7 +56,6 @@ app.use(notFoundHandler);
 // Error handler
 app.use(errorHandler);
 
-// Start server
 const server = app.listen(PORT, () => {
   console.log(`\n🚀 Server running on http://localhost:${PORT}`);
   console.log(`📧 Environment: ${process.env.NODE_ENV || 'development'}`);

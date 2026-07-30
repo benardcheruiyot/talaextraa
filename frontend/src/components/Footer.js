@@ -1,5 +1,6 @@
 // Footer.js
 import React from 'react';
+import { Link } from 'react-router-dom';
 import './Footer.css';
 
 const Footer = () => {
@@ -7,9 +8,9 @@ const Footer = () => {
     <footer className="footer">
       <div className="footer-inner">
         <div className="footer-links">
-          <a href="/privacy">Privacy</a>
-          <a href="/terms">Terms</a>
-          <a href="/contact">Contact</a>
+          <Link to="/privacy">Privacy</Link>
+          <Link to="/terms">Terms</Link>
+          <Link to="/contact">Contact</Link>
         </div>
         <p>© 2025 Tala Mkopo Extra. Licensed by CBK.</p>
       </div>
