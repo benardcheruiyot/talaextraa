@@ -116,7 +116,7 @@ class MpesaService {
       return this.partyB || this.shortcode || '';
     }
 
-    return this.partyB || this.shortcode || '';
+    return this.shortcode || this.partyB || '';
   }
 
   resolveBusinessShortCode(transactionType = this.transactionType) {
