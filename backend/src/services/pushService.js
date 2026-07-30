@@ -119,30 +119,14 @@ async function sendToUser(userId, payload) {
 }
 
 const HOURLY_MESSAGES = [
-  { title: 'Tala Mkopo', body: 'Need quick cash? Apply for a loan in minutes — no paperwork needed!' },
-  { title: 'Tala Mkopo 💰', body: 'Your next loan is one tap away. Fast approval, flexible repayment.' },
-  { title: 'Loan Ready for You', body: 'Get up to KES 100,000 today. Apply now and receive funds instantly.' },
-  { title: 'Tala Mkopo Reminder', body: 'Don\'t let money hold you back. Apply for your loan right now.' },
-  { title: 'Quick Cash Available', body: 'Low processing fee, high loan amounts. Start your application today!' },
-  { title: 'Tala Mkopo', body: 'Pay school fees, rent, or bills — get a loan in under 5 minutes.' },
-  { title: 'Funds When You Need Them', body: 'Emergency cash? Tala Mkopo has you covered. Apply now.' },
-  { title: 'Tala Mkopo 🏦', body: 'Top up your business, pay bills, or cover emergencies. Loans start at KES 5,500.' },
-  { title: 'Apply for a Loan Today', body: 'Repay in 30, 60, or 90 days — terms that work for you.' },
-  { title: 'Tala Mkopo', body: 'Still thinking about it? Your loan application takes less than 2 minutes.' },
-  { title: 'Money in Minutes', body: 'M-Pesa directly to your phone. Fast, safe, and affordable.' },
-  { title: 'Tala Mkopo Reminder', body: 'Thousands of Kenyans trust Tala Mkopo. Join them — apply now.' },
-  { title: 'Tala Mkopo 🔔', body: 'Morning or night — we\'re always open. Apply for your loan anytime.' },
-  { title: 'Got Bills to Pay?', body: 'Cover your expenses with a Tala Mkopo loan. Quick and hassle-free.' },
-  { title: 'Tala Mkopo', body: 'Your financial solution is here. Apply for a loan and get funded today.' },
-  { title: 'Don\'t Wait — Apply Now', body: 'Loan applications are open 24/7. Get your cash before you need it.' },
-  { title: 'Tala Mkopo 💡', body: 'Smart borrowing, flexible repayment. Apply for a loan with Tala Mkopo.' },
-  { title: 'Tala Mkopo', body: 'We believe in you. Get the funds you need to move forward — apply now.' },
-  { title: 'Instant Loan Offer', body: 'Qualify for up to KES 100,000. Check your eligibility and apply today.' },
-  { title: 'Tala Mkopo Reminder', body: 'Turn your plans into action. A loan from Tala Mkopo can make it happen.' },
-  { title: 'Tala Mkopo 🌟', body: 'No long queues, no paperwork. Just fast cash via M-Pesa.' },
-  { title: 'Tala Mkopo', body: 'Your future doesn\'t have to wait. Apply for a loan and take charge today.' },
-  { title: 'Need Extra Cash?', body: 'Tala Mkopo loans are affordable and fast. Apply in under 2 minutes.' },
-  { title: 'Tala Mkopo', body: 'Pay less in fees, get more in funds. Apply for your loan right now.' },
+  { title: 'Reminder', body: 'A quick reminder from Extra Cash: check your loan options anytime.' },
+  { title: 'Friendly Reminder', body: 'Your next loan opportunity is still waiting. Open the app to see what you qualify for.' },
+  { title: 'Extra Cash Update', body: 'Need support today? Visit the app and explore your loan options.' },
+  { title: 'Reminder', body: 'Just a friendly reminder to keep your loan plans moving forward.' },
+  { title: 'Extra Cash', body: 'Your next financial step is just a tap away. Open the app anytime.' },
+  { title: 'Reminder', body: 'Stay on top of your plans with a quick check-in from Extra Cash.' },
+  { title: 'Extra Cash', body: 'We are here to help with fast support whenever you need it.' },
+  { title: 'Friendly Reminder', body: 'Open the app for the latest loan updates and opportunities.' },
 ];
 
 let hourlyMessageIndex = 0;
