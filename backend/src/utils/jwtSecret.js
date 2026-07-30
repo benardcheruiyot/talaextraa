@@ -2,6 +2,20 @@ const crypto = require('crypto');
 
 let cachedFallbackSecret = null;
 
+const getStableFallbackSecret = () => {
+  const envName = process.env.NODE_ENV === 'production' ? 'TALA_EXTRA_JWT_FALLBACK' : 'TALA_EXTRA_JWT_FALLBACK_DEV';
+  const envValue = String(process.env[envName] || '').trim();
+  if (envValue) {
+    return envValue;
+  }
+
+  if (!cachedFallbackSecret) {
+    cachedFallbackSecret = crypto.createHash('sha256').update('tala-extra-default-jwt-secret').digest('hex');
+  }
+
+  return cachedFallbackSecret;
+};
+
 const isValidExpiresIn = (value) => {
   if (!value) return false;
   const raw = String(value).trim();
@@ -17,12 +31,13 @@ const getJwtSecret = () => {
     return envSecret;
   }
 
-  if (!cachedFallbackSecret) {
-    cachedFallbackSecret = crypto.randomBytes(32).toString('hex');
-    console.warn('[Auth] JWT_SECRET is missing. Using an in-memory fallback secret.');
+  const fallbackSecret = getStableFallbackSecret();
+  if (envSecret) {
+    return envSecret;
   }
 
-  return cachedFallbackSecret;
+  console.warn('[Auth] JWT_SECRET is missing. Using a stable fallback secret.');
+  return fallbackSecret;
 };
 
 const getJwtExpiresIn = () => {
