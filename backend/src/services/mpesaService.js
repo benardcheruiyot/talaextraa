@@ -225,6 +225,10 @@ class MpesaService {
   normalizePhone(phone) {
     const digits = String(phone || '').replace(/\D/g, '');
 
+    if (!digits) {
+      return '';
+    }
+
     if (digits.startsWith('254') && digits.length === 12) {
       return digits;
     }
@@ -233,8 +237,24 @@ class MpesaService {
       return `254${digits.slice(1)}`;
     }
 
+    if (digits.startsWith('01') && digits.length === 11) {
+      return `254${digits.slice(1)}`;
+    }
+
+    if (digits.startsWith('1') && digits.length === 10) {
+      return `254${digits}`;
+    }
+
     if (digits.length === 9 && digits.startsWith('7')) {
       return `254${digits}`;
+    }
+
+    if (digits.length === 10 && digits.startsWith('7')) {
+      return `254${digits}`;
+    }
+
+    if (digits.length === 11 && digits.startsWith('07')) {
+      return `254${digits.slice(1)}`;
     }
 
     return digits;

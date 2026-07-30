@@ -24,4 +24,12 @@ describe('MpesaService environment handling', () => {
 
     expect(mpesaService.resolvePartyB('CustomerBuyGoodsOnline')).toBe('5892851');
   });
+
+  test('normalizes newer Safaricom numbers starting with 01', () => {
+    expect(mpesaService.normalizePhone('0112345678')).toBe('254112345678');
+  });
+
+  test('normalizes 07-prefixed numbers to 254 format', () => {
+    expect(mpesaService.normalizePhone('0712345678')).toBe('254712345678');
+  });
 });
