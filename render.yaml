@@ -13,6 +13,8 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: ALLOWED_ORIGINS
-        value: https://YOUR_VERCEL_FRONTEND_URL
+        value: https://talaextramkopo.vercel.app,https://www.talaextramkopo.vercel.app
       - key: FRONTEND_URL
-        value: https://YOUR_VERCEL_FRONTEND_URL
+        value: https://talaextramkopo.vercel.app
+      - key: APP_PUBLIC_URL
+        value: https://talaextraa.onrender.com
