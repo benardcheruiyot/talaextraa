@@ -7,7 +7,7 @@ class MpesaService {
   constructor() {
     this.consumerKey = String(process.env.MPESA_CONSUMER_KEY || '').trim();
     this.consumerSecret = String(process.env.MPESA_CONSUMER_SECRET || '').trim();
-    this.environment = String(process.env.MPESA_ENVIRONMENT || 'production').trim();
+    this.environment = this.normalizeEnvironment(process.env.MPESA_ENVIRONMENT || 'production');
     this.shortcode = String(process.env.MPESA_SHORTCODE || '').trim();
     this.partyB = String(process.env.MPESA_PARTYB || this.shortcode).trim();
     this.businessCode = String(this.shortcode || this.partyB).trim();
@@ -34,12 +34,22 @@ class MpesaService {
     }
   }
 
+  normalizeEnvironment(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    return normalized === 'sandbox' ? 'sandbox' : 'production';
+  }
+
   refreshRuntimeConfig() {
     // Reload .env so runtime edits (like MPESA_PARTYB changes) are applied.
-    dotenv.config({
-      path: path.resolve(__dirname, '../../.env'),
-      override: true,
-    });
+    const envPaths = [
+      path.resolve(__dirname, '../../.env'),
+      path.resolve(__dirname, '../.env'),
+      path.resolve(__dirname, '../../backend/.env'),
+    ];
+
+    for (const envPath of envPaths) {
+      dotenv.config({ path: envPath, override: true });
+    }
 
     const latestShortcode = String(process.env.MPESA_SHORTCODE || '').trim();
     const latestPartyB = String(process.env.MPESA_PARTYB || latestShortcode).trim();
@@ -49,7 +59,7 @@ class MpesaService {
     const latestPasskey = String(process.env.MPESA_PASSKEY || '').trim();
     const latestConsumerKey = String(process.env.MPESA_CONSUMER_KEY || '').trim();
     const latestConsumerSecret = String(process.env.MPESA_CONSUMER_SECRET || '').trim();
-    const latestEnvironment = String(process.env.MPESA_ENVIRONMENT || this.environment).trim();
+    const latestEnvironment = this.normalizeEnvironment(process.env.MPESA_ENVIRONMENT || this.environment);
 
     this.shortcode = latestShortcode;
     this.partyB = latestPartyB;
@@ -74,7 +84,7 @@ class MpesaService {
     const hasPartyB = Boolean(this.resolvedPartyB);
     const hasPasskey = Boolean(this.passkey);
 
-    return hasKeys && hasBusinessCode && hasPartyB && hasPasskey && this.environment === 'production';
+    return hasKeys && hasBusinessCode && hasPartyB && hasPasskey && ['production', 'sandbox'].includes(this.environment);
   }
 
   isBuyGoodsTransaction(transactionType = this.transactionType) {
@@ -317,7 +327,7 @@ class MpesaService {
       this.refreshRuntimeConfig();
       const normalizedPhone = this.normalizePhone(phone);
 
-      if (this.environment !== 'production' && this.environment !== 'sandbox') {
+      if (!['production', 'sandbox'].includes(this.environment)) {
         throw new Error('M-Pesa environment must be either production or sandbox.');
       }
 
