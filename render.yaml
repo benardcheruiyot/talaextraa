@@ -11,7 +11,9 @@ services:
       - key: PORT
         value: 10000
       - key: JWT_SECRET
-        generateValue: true
+        value: xvzs6TGf7xKo3qZIHSGXz0cRYeI4G37c2uGosSsFufueiVnQtnUcZ2IBXBfmS3WR
+      - key: TALA_EXTRA_JWT_FALLBACK
+        value: xvzs6TGf7xKo3qZIHSGXz0cRYeI4G37c2uGosSsFufueiVnQtnUcZ2IBXBfmS3WR
       - key: ALLOWED_ORIGINS
         value: https://talaextramkopo.vercel.app,https://www.talaextramkopo.vercel.app
       - key: FRONTEND_URL

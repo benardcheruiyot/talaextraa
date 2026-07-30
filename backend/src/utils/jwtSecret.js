@@ -13,7 +13,7 @@ const loadEnv = () => {
   ];
 
   for (const envPath of envPaths) {
-    dotenv.config({ path: envPath, override: true });
+    dotenv.config({ path: envPath, override: false });
   }
 };
 
@@ -63,6 +63,7 @@ const getJwtVerificationSecrets = () => {
   };
 
   addSecret(process.env.JWT_SECRET);
+  addSecret(process.env.TALA_EXTRA_JWT_FALLBACK);
   addSecret(getJwtSecret());
   addSecret(getStableFallbackSecret());
   addSecret('local_dev_jwt_secret_change_me');
