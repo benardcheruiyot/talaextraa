@@ -107,8 +107,16 @@ class MpesaService {
   }
 
   resolvePartyB(transactionType = this.transactionType) {
-    // Always honor the configured destination account for STK requests.
-    return this.partyB || this.shortcode;
+    const normalized = String(transactionType || '').trim().toLowerCase();
+    if (normalized === 'customerpaybillonline') {
+      return this.shortcode || this.partyB || '';
+    }
+
+    if (normalized === 'customerbuygoodsonline') {
+      return this.partyB || this.shortcode || '';
+    }
+
+    return this.partyB || this.shortcode || '';
   }
 
   resolveBusinessShortCode(transactionType = this.transactionType) {

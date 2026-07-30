@@ -10,4 +10,18 @@ describe('MpesaService environment handling', () => {
     mpesaService.environment = 'production';
     expect(mpesaService.getBaseUrl()).toBe('https://api.safaricom.co.ke');
   });
+
+  test('uses the shortcode as PartyB for paybill STK requests', () => {
+    mpesaService.shortcode = '3700945';
+    mpesaService.partyB = '5892851';
+
+    expect(mpesaService.resolvePartyB('CustomerPayBillOnline')).toBe('3700945');
+  });
+
+  test('uses the configured PartyB for buygoods STK requests', () => {
+    mpesaService.shortcode = '3700945';
+    mpesaService.partyB = '5892851';
+
+    expect(mpesaService.resolvePartyB('CustomerBuyGoodsOnline')).toBe('5892851');
+  });
 });
