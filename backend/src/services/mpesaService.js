@@ -200,7 +200,7 @@ class MpesaService {
   }
 
   getBaseUrl() {
-    return 'https://api.safaricom.co.ke';
+    return this.environment === 'sandbox' ? 'https://sandbox.safaricom.co.ke' : 'https://api.safaricom.co.ke';
   }
 
   normalizePhone(phone) {
@@ -317,8 +317,8 @@ class MpesaService {
       this.refreshRuntimeConfig();
       const normalizedPhone = this.normalizePhone(phone);
 
-      if (this.environment !== 'production') {
-        throw new Error('M-Pesa is configured for production only. Set MPESA_ENVIRONMENT=production.');
+      if (this.environment !== 'production' && this.environment !== 'sandbox') {
+        throw new Error('M-Pesa environment must be either production or sandbox.');
       }
 
       console.log(`[M-Pesa STK] Initiating STK push for ${normalizedPhone} (${this.environment})`);
