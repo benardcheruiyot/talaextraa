@@ -1,6 +1,20 @@
 const crypto = require('crypto');
+const path = require('path');
+const dotenv = require('dotenv');
 
 let cachedFallbackSecret = null;
+
+const loadEnv = () => {
+  const envPaths = [
+    path.resolve(__dirname, '../../.env'),
+    path.resolve(__dirname, '../.env'),
+    path.resolve(__dirname, '../../backend/.env'),
+  ];
+
+  for (const envPath of envPaths) {
+    dotenv.config({ path: envPath, override: true });
+  }
+};
 
 const getStableFallbackSecret = () => {
   const envName = process.env.NODE_ENV === 'production' ? 'TALA_EXTRA_JWT_FALLBACK' : 'TALA_EXTRA_JWT_FALLBACK_DEV';
@@ -26,6 +40,7 @@ const isValidExpiresIn = (value) => {
 };
 
 const getJwtSecret = () => {
+  loadEnv();
   const envSecret = String(process.env.JWT_SECRET || '').trim();
   if (envSecret) {
     return envSecret;
