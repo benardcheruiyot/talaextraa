@@ -1,64 +1,33 @@
-// User Model - MongoDB
+// User Model - In-Memory Storage
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const mongoose = require('mongoose');
 const { getJwtSecret, getJwtExpiresIn } = require('../utils/jwtSecret');
 
-const userSchema = new mongoose.Schema(
-  {
-    name: String,
-    email: {
-      type: String,
-      lowercase: true,
-      trim: true,
-      index: true,
-    },
-    phone_number: {
-      type: String,
-      required: true,
-      unique: true,
-      index: true,
-    },
-    password: {
-      type: String,
-      required: true,
-      select: false,
-    },
-  },
-  {
-    timestamps: true,
-  }
-);
-
-// Register model once
-let UserModel = null;
-
-const getModel = () => {
-  // Check if connection is ready
-  if (mongoose.connection.readyState !== 1) {
-    throw new Error('MongoDB not connected. Connection state: ' + mongoose.connection.readyState);
-  }
-  
-  if (!UserModel) {
-    if (mongoose.models.User) {
-      UserModel = mongoose.models.User;
-    } else {
-      UserModel = mongoose.model('User', userSchema);
-    }
-  }
-  return UserModel;
-};
+// In-memory store
+const users = new Map();
 
 class User {
+  constructor(data) {
+    this.id = data.id;
+    this.name = data.name;
+    this.email = data.email;
+    this.phone_number = data.phone_number;
+    this.password = data.password;
+    this.createdAt = new Date();
+    this.updatedAt = new Date();
+  }
+
   static async create(data) {
     try {
-      const model = getModel();
       const hashedPassword = await bcrypt.hash(data.password, 10);
-      const user = new model({
+      const user = new User({
         ...data,
+        id: Date.now().toString(),
         password: hashedPassword,
       });
-      return await user.save();
+      users.set(user.id, user);
+      console.log(`[User] Created user ${user.phone_number}`);
+      return user;
     } catch (error) {
       console.error('[User.create] Error:', error.message);
       throw error;
@@ -67,21 +36,24 @@ class User {
 
   static async findByPhone(phone) {
     try {
-      const model = getModel();
-      return await model.findOne({ phone_number: phone });
+      for (let user of users.values()) {
+        if (user.phone_number === phone) {
+          return user;
+        }
+      }
+      return null;
     } catch (error) {
       console.error('[User.findByPhone] Error:', error.message);
-      throw error;
+      return null;
     }
   }
 
   static async findById(id) {
     try {
-      const model = getModel();
-      return await model.findById(id);
+      return users.get(id) || null;
     } catch (error) {
       console.error('[User.findById] Error:', error.message);
-      throw error;
+      return null;
     }
   }
 
@@ -91,14 +63,14 @@ class User {
 
   generateToken() {
     return jwt.sign(
-      { id: this._id, phone: this.phone_number },
+      { id: this.id, phone: this.phone_number },
       getJwtSecret(),
       { expiresIn: getJwtExpiresIn() }
     );
   }
 
   toJSON() {
-    const { password, ...user } = this.toObject();
+    const { password, ...user } = this;
     return user;
   }
 }
