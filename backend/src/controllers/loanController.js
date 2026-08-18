@@ -156,7 +156,10 @@ class LoanController {
     try {
       const { phone, amount, loanAmount, termDays } = req.body;
 
+      console.log('[STK Push] Request received:', { phone, amount, loanAmount, termDays, userId: req.user?.id });
+
       if (!phone || !amount) {
+        console.error('[STK Push] Missing phone or amount');
         return next(new AppError('Phone number and amount are required', 400));
       }
 
@@ -167,13 +170,23 @@ class LoanController {
         loanService.validateLoanAmount(Number(resolvedLoanAmount));
       }
 
+      console.log('[STK Push] Calling mpesaService.initiateStkPush');
       const result = await mpesaService.initiateStkPush(phone, amount);
+      
+      console.log('[STK Push] M-Pesa result:', {
+        success: result.success,
+        checkoutRequestId: result.checkoutRequestId,
+        merchantRequestId: result.merchantRequestId,
+        hasRawResponse: !!result.rawResponse,
+      });
 
       if (!result.success) {
+        console.error('[STK Push] M-Pesa call failed:', result.message);
         return next(new AppError(result.message, 400));
       }
 
-      await MpesaTransaction.create({
+      console.log('[STK Push] Creating MpesaTransaction record');
+      const txn = await MpesaTransaction.create({
         checkoutRequestId: result.checkoutRequestId,
         merchantRequestId: result.merchantRequestId,
         userId: req.user.id,
@@ -185,15 +198,21 @@ class LoanController {
         rawResponse: result.rawResponse || null,
       });
 
-      // Return M-Pesa response fields for frontend
-      res.status(200).json({
+      console.log('[STK Push] MpesaTransaction created:', txn.id);
+
+      const responsePayload = {
         ResponseCode: '0',
         ResponseDescription: 'Success. Request accepted for processing',
         CustomerMessage: 'Success. Request accepted for processing',
         MerchantRequestID: result.merchantRequestId,
         CheckoutRequestID: result.checkoutRequestId,
         reference: result.checkoutRequestId,
-      });
+      };
+
+      console.log('[STK Push] Sending response:', responsePayload);
+
+      // Return M-Pesa response fields for frontend
+      res.status(200).json(responsePayload);
 
       // Notify device that STK push was sent
       pushService.sendToUser(req.user.id, {
@@ -201,8 +220,9 @@ class LoanController {
         body: `M-Pesa payment request of KES ${amount} sent. Enter your PIN to confirm.`,
         icon: '/favicon.ico',
         url: this.appUrl,
-      }).catch(() => {});
+      }).catch((err) => console.error('[Push Notification Error]:', err.message));
     } catch (error) {
+      console.error('[STK Push] Exception caught:', error.message, error.stack);
       next(new AppError(error.message, 400));
     }
   }

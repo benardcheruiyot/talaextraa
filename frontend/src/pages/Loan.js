@@ -302,10 +302,17 @@ const Loan = () => {
         selectedLoan.days
       );
 
+      console.log('[Loan] STK Push result:', result);
+      console.log('[Loan] Checking ResponseCode:', result?.ResponseCode);
+
       // Check if STK push was successful (ResponseCode '0' = success)
-      if (!result.ResponseCode || result.ResponseCode !== '0') {
-        throw new Error(result.CustomerMessage || result.message || 'Failed to initiate payment');
+      if (!result?.ResponseCode || result.ResponseCode !== '0') {
+        const errorMsg = result?.CustomerMessage || result?.message || 'Failed to initiate payment';
+        console.error('[Loan] STK Push failed:', errorMsg);
+        throw new Error(errorMsg);
       }
+
+      console.log('[Loan] STK Push succeeded, checking out with:', result.CheckoutRequestID);
 
       Swal.fire({
         title: 'STK Push Sent',

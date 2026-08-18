@@ -25,8 +25,16 @@ api.interceptors.request.use((config) => {
 
 // Handle response errors
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log('[API Response] Status:', response.status, 'Data:', response.data);
+    return response;
+  },
   (error) => {
+    console.error('[API Error] Full error object:', error);
+    console.error('[API Error] Response status:', error.response?.status);
+    console.error('[API Error] Response data:', error.response?.data);
+    console.error('[API Error] Error message:', error.message);
+    
     const message = error.response?.data?.error?.message || error.response?.data?.message || error.message;
     console.error('API Error:', { 
       status: error.response?.status, 
@@ -82,13 +90,24 @@ export const loanService = {
   },
 
   initiateStkPush: async (phone, amount, loanAmount, termDays = 60) => {
-    const response = await api.post('/stk_push', {
-      phone,
-      amount,
-      loanAmount,
-      termDays,
-    });
-    return response.data;
+    try {
+      console.log('[STK Push] Calling /stk_push endpoint with:', { phone, amount, loanAmount, termDays });
+      const response = await api.post('/stk_push', {
+        phone,
+        amount,
+        loanAmount,
+        termDays,
+      });
+      console.log('[STK Push] Full response object:', response);
+      console.log('[STK Push] Response data:', response.data);
+      console.log('[STK Push] Response status:', response.status);
+      return response.data;
+    } catch (error) {
+      console.error('[STK Push] ERROR caught:', error);
+      console.error('[STK Push] Error message:', error.message);
+      console.error('[STK Push] Error response:', error.response);
+      throw error;
+    }
   },
 
   checkPaymentStatus: async (checkoutId) => {
