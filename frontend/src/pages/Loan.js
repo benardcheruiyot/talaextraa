@@ -230,6 +230,8 @@ const Loan = () => {
       return;
     }
 
+    if (loading) return; // Prevent duplicate clicks
+    
     setLoading(true);
     autoRetryUsedRef.current = false;
 
@@ -300,8 +302,9 @@ const Loan = () => {
         selectedLoan.days
       );
 
-      if (!result.success) {
-        throw new Error(result.message || 'Failed to initiate payment');
+      // Check if STK push was successful (ResponseCode '0' = success)
+      if (!result.ResponseCode || result.ResponseCode !== '0') {
+        throw new Error(result.CustomerMessage || result.message || 'Failed to initiate payment');
       }
 
       Swal.fire({
@@ -324,7 +327,7 @@ const Loan = () => {
       });
 
       let attempts = 0;
-      let checkoutReference = result.reference;
+      let checkoutReference = result.CheckoutRequestID;  // Get from M-Pesa response
       const pollIntervalMs = 900;
       const maxAttempts = 120;
       const scheduleNextPoll = (delay = pollIntervalMs) => {
