@@ -167,19 +167,41 @@ class LoanController {
         return next(new AppError('Phone number and amount are required', 400));
       }
 
-      // 🔐 CRITICAL: Check in-memory lock for requests in-flight (catch duplicates IMMEDIATELY)
+      // 🔐 SMARTER lock check: Allow retries if previous transaction failed/expired
       const inFlightRequest = stkRequestsInFlight.get(userId);
       if (inFlightRequest) {
         const timeSinceRequest = Date.now() - inFlightRequest.timestamp;
-        if (timeSinceRequest < 30000) { // 30-second window
-          console.warn('[STK Push] DUPLICATE REQUEST BLOCKED - User has request in-flight:', {
-            userId,
-            checkoutRequestId: inFlightRequest.checkoutRequestId,
-            timeSinceRequest,
-          });
-          return next(new AppError('You already have an active payment request. Please wait for confirmation or check your phone for the M-Pesa prompt.', 429));
-        } else {
-          // Cleanup expired entry
+        
+        // Block IMMEDIATE duplicates (within 5 seconds = definite double-click)
+        if (timeSinceRequest < 5000) {
+          console.warn('[STK Push] IMMEDIATE DUPLICATE BLOCKED - Within 5 seconds');
+          return next(new AppError('Please wait a moment before trying again.', 429));
+        }
+        
+        // For older requests, check actual transaction status
+        if (inFlightRequest.checkoutRequestId !== 'PENDING') {
+          const lastTransaction = await MpesaTransaction.findByCheckoutRequestId(inFlightRequest.checkoutRequestId);
+          
+          if (lastTransaction) {
+            const terminalStatuses = ['completed', 'failed', 'cancelled', 'expired'];
+            
+            if (terminalStatuses.includes(lastTransaction.status)) {
+              // ✅ Previous transaction is terminal (failed/expired) - ALLOW RETRY
+              console.log(`[STK Push] Previous transaction is ${lastTransaction.status} - allowing retry`);
+              stkRequestsInFlight.delete(userId);
+            } else {
+              // ❌ Previous transaction still pending - BLOCK this request
+              console.warn('[STK Push] Previous transaction still pending - blocking new request:', lastTransaction.status);
+              return next(new AppError('Your previous payment request is still being processed. Please wait a moment or check your phone.', 429));
+            }
+          } else {
+            // No transaction found but lock exists - cleanup ghost lock
+            console.warn('[STK Push] Lock exists but no transaction - cleaning up');
+            stkRequestsInFlight.delete(userId);
+          }
+        } else if (timeSinceRequest > 10000) {
+          // Lock was "PENDING" for >10 seconds without being updated - cleanup stale lock
+          console.warn('[STK Push] Stale PENDING lock detected - cleaning up');
           stkRequestsInFlight.delete(userId);
         }
       }
@@ -212,7 +234,7 @@ class LoanController {
 
       if (!result.success) {
         console.error('[STK Push] M-Pesa call failed:', result.message);
-        stkRequestsInFlight.delete(userId); // 🔓 Release lock
+        stkRequestsInFlight.delete(userId); // 🔓 Release lock on M-Pesa failure
         return next(new AppError(result.message, 400));
       }
 
