@@ -28,6 +28,26 @@ app.use(morgan('combined'));
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ limit: '10kb', extended: true }));
 
+// ✅ Request timeout handler - ensure we don't hang requests
+app.use((req, res, next) => {
+  // Set a timeout of 25 seconds for all requests
+  const timeout = setTimeout(() => {
+    if (!res.headersSent) {
+      console.warn(`[Timeout] Request timeout for ${req.method} ${req.path}`);
+      res.status(504).json({
+        success: false,
+        message: 'Request timeout - server took too long to respond',
+      });
+    }
+  }, 25000);
+
+  // Clear timeout if response is sent
+  res.on('finish', () => clearTimeout(timeout));
+  res.on('close', () => clearTimeout(timeout));
+
+  next();
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.status(200).json({
