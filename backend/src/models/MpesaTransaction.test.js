@@ -41,4 +41,12 @@ describe('MpesaTransaction persistence', () => {
     expect(MpesaTransaction.getStatusFromResultCode('1037')).toBe('expired');
     expect(MpesaTransaction.getStatusFromResultCode('500')).toBe('failed');
   });
+
+  it('does not recycle a terminal failed or completed payment as an active request', () => {
+    const MpesaTransaction = require('./MpesaTransaction');
+
+    expect(MpesaTransaction.shouldHoldTerminalStatus('failed', '500', false, 1000)).toBe(false);
+    expect(MpesaTransaction.shouldHoldTerminalStatus('completed', '0', false, 1000)).toBe(false);
+    expect(MpesaTransaction.shouldHoldTerminalStatus('cancelled', '1032', false, 1000)).toBe(false);
+  });
 });

@@ -96,6 +96,16 @@ class MpesaTransaction {
     return 'failed';
   }
 
+  static shouldHoldTerminalStatus(status, resultCode, callbackConfirmed, transactionAgeMs) {
+    const normalizedStatus = status || this.getStatusFromResultCode(resultCode);
+
+    if (['completed', 'failed', 'cancelled', 'expired'].includes(normalizedStatus)) {
+      return false;
+    }
+
+    return false;
+  }
+
   static async create(data) {
     try {
       const txnList = transactionsFromStore();

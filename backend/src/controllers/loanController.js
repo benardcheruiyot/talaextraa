@@ -160,6 +160,14 @@ class LoanController {
     try {
       const lastTransaction = await MpesaTransaction.findLastByUserId(req.user.id);
 
+      if (lastTransaction && ['completed', 'failed', 'cancelled', 'expired'].includes(lastTransaction.status)) {
+        stkRequestsInFlight.delete(req.user.id);
+        return res.status(200).json({
+          success: true,
+          data: null,
+        });
+      }
+
       // Only return if the transaction is still active (initiated or pending)
       if (lastTransaction && ['initiated', 'pending'].includes(lastTransaction.status)) {
         return res.status(200).json({
@@ -316,7 +324,7 @@ class LoanController {
         title: 'Check Your Phone',
         body: `M-Pesa payment request of KES ${amount} sent. Enter your PIN to confirm.`,
         icon: '/favicon.ico',
-        url: this.appUrl,
+        url: `${this.appUrl}/apply`,
         checkoutRequestId: result.checkoutRequestId,
         actions: [
           { action: 'open', title: 'Open app' },
@@ -444,9 +452,12 @@ class LoanController {
       // Some STK status queries can briefly return terminal states before the user finishes
       // handset confirmation. Keep polling as pending for a short grace window unless callback-confirmed.
       if (
-        queryTerminalStatuses.includes(normalizedStatus) &&
-        !callbackConfirmed &&
-        transactionAgeMs < TERMINAL_STATUS_GRACE_MS
+        MpesaTransaction.shouldHoldTerminalStatus(
+          normalizedStatus,
+          result.resultCode,
+          callbackConfirmed,
+          transactionAgeMs
+        )
       ) {
         console.log(
           `[Check Status] Holding early terminal result as pending (${normalizedStatus}) at ${transactionAgeMs}ms`
@@ -581,7 +592,7 @@ class LoanController {
             title: 'Payment Received!',
             body: 'Your M-Pesa payment was confirmed. Your loan is being processed.',
             icon: '/favicon.ico',
-            url: this.appUrl,
+            url: `${this.appUrl}/apply`,
             checkoutRequestId: CheckoutRequestID,
             actions: [
               { action: 'open', title: 'Open app' },

@@ -54,8 +54,10 @@ self.addEventListener('notificationclick', function (event) {
   const isPaymentNotification = event.notification.data && event.notification.data.isPaymentNotification;
   const checkoutRequestId = event.notification.data && event.notification.data.checkoutRequestId;
   
-  const urlToOpen = isPaymentNotification && checkoutRequestId 
-    ? targetUrl + (targetUrl.includes('?') ? '&' : '?') + 'checkPayment=' + checkoutRequestId
+  const urlToOpen = isPaymentNotification && checkoutRequestId
+    ? (targetUrl.endsWith('/apply') || targetUrl.endsWith('/loan')
+        ? targetUrl + (targetUrl.includes('?') ? '&' : '?') + 'checkPayment=' + checkoutRequestId
+        : targetUrl.replace(/\/?$/, '') + '/apply?checkPayment=' + checkoutRequestId)
     : targetUrl;
 
   console.log('[Service Worker] Opening URL:', urlToOpen, 'isPayment:', isPaymentNotification);

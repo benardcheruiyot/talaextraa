@@ -1,6 +1,6 @@
 // Loan.js - Loan Application Page
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { loanService } from '../services/api';
 import { formatCurrency } from '../utils/helpers';
 import { useAuth } from '../hooks/useAuth';
@@ -55,6 +55,7 @@ const readPendingLoanApplication = () => {
 
 const Loan = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const paymentPollRef = useRef(null);
   const isMountedRef = useRef(true);
@@ -280,6 +281,53 @@ const Loan = () => {
       };
     }
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const checkoutRequestId = params.get('checkPayment');
+
+    if (!checkoutRequestId) return;
+
+    console.log('[Loan] checkPayment param detected:', checkoutRequestId);
+
+    (async () => {
+      try {
+        const statusResult = await loanService.checkPaymentStatus(checkoutRequestId);
+        console.log('[Loan] Payment status from notification action:', statusResult);
+
+        if (statusResult.success) {
+          Swal.fire({
+            title: 'Payment Received!',
+            html: `
+              <div class="stk-modal-content">
+                <div class="stk-success-check">✓</div>
+                <p class="stk-instruction">Your M-Pesa payment was confirmed. Your loan is being processed.</p>
+              </div>
+            `,
+            customClass: { popup: 'stk-modal' },
+            timer: 2400,
+            showConfirmButton: false,
+          });
+        } else if (statusResult.status === 'failed' || statusResult.status === 'cancelled' || statusResult.status === 'expired') {
+          Swal.fire({
+            icon: 'warning',
+            title: 'Payment Not Confirmed',
+            text: statusResult.resultDescription || 'Your payment was not confirmed. Please try again.',
+            confirmButtonColor: '#26c2a3',
+          });
+        } else {
+          Swal.fire({
+            icon: 'info',
+            title: 'Payment Pending',
+            text: 'Your payment is still being processed. Please wait a moment.',
+            confirmButtonColor: '#26c2a3',
+          });
+        }
+      } catch (error) {
+        console.error('[Loan] Error checking payment from notification URL:', error);
+      }
+    })();
+  }, [location.search]);
 
   useEffect(() => {
     return () => {
@@ -634,63 +682,46 @@ const Loan = () => {
         error.code === 'ECONNABORTED';
 
       if (isWaitState) {
-        // 🔄 RECOVERY: Try to fetch and resume the active payment request
+        // Do not show this stale duplicate popup. If an active STK request exists,
+        // continue waiting silently and resume polling. If not, keep the lock and let the
+        // current request continue without user interruption.
+        console.warn('[Loan] Duplicate request detected; resuming active flow without showing error popup');
+
+        if (requestLockRef.current === true) {
+          if (isMountedRef.current) setLoading(true);
+          return;
+        }
+
         (async () => {
           try {
-            console.log('[Loan] Attempting payment recovery...');
-
-            // Show recovery prompt
-            Swal.fire({
-              title: 'Resuming Your Payment',
-              html: `
-                <div class="stk-modal-content">
-                  <div class="stk-spinner" aria-hidden="true"></div>
-                  <p class="stk-progress-note">Looking for your active payment request...</p>
-                </div>
-              `,
-              customClass: {
-                popup: 'stk-modal',
-              },
-              showConfirmButton: false,
-              allowOutsideClick: false,
-              allowEscapeKey: false,
-            });
-
-            // Fetch active payment request
             const activePayment = await loanService.getActivePaymentRequest();
 
             if (activePayment?.checkoutRequestId) {
               console.log('[Loan] Found active payment, resuming polling for:', activePayment.checkoutRequestId);
-              
               requestLockRef.current = true;
               setLoading(true);
 
-              // Close the recovery prompt and show STK confirmation
               Swal.fire({
-                title: 'STK Push Sent',
+                title: 'Resuming Payment',
                 html: `
                   <div class="stk-modal-content">
                     <div class="stk-spinner" aria-hidden="true"></div>
-                    <p class="stk-instruction">Enter your M-Pesa PIN on your phone to approve payment.</p>
+                    <p class="stk-instruction">A secure M-Pesa request is already in progress. We are continuing the active payment check.</p>
                     <div class="stk-status-pill">Amount: ${formatCurrency(selectedLoan.fee)}</div>
                     <p class="stk-progress-note">Waiting for payment confirmation...</p>
-                    <p class="stk-progress-sub" id="stkAttemptHint">This usually takes less than 60 seconds.</p>
                   </div>
                 `,
-                customClass: {
-                  popup: 'stk-modal',
-                },
+                customClass: { popup: 'stk-modal' },
                 showConfirmButton: false,
                 allowOutsideClick: false,
                 allowEscapeKey: false,
               });
 
-              // Resume polling with the active checkoutRequestId
               let attempts = 0;
               let checkoutReference = activePayment.checkoutRequestId;
               const pollIntervalMs = 900;
               const maxAttempts = 120;
-              
+
               const scheduleNextPoll = (delay = pollIntervalMs) => {
                 paymentPollRef.current = setTimeout(runPoll, delay);
               };
@@ -718,8 +749,7 @@ const Loan = () => {
 
                   if (statusResult.success) {
                     clearTimeout(paymentPollRef.current);
-                    requestLockRef.current = false; // 🔓 Release lock on success
-
+                    requestLockRef.current = false;
                     const applicationPayload = formatLoanReceipt(selectedLoan, checkoutReference, user);
                     localStorage.setItem('pending_loan_application', JSON.stringify(applicationPayload));
 
@@ -731,28 +761,19 @@ const Loan = () => {
                           <p class="stk-instruction">Payment received successfully. Your loan will be processed and disbursed within 48 hours.</p>
                         </div>
                       `,
-                      customClass: {
-                        popup: 'stk-modal',
-                      },
+                      customClass: { popup: 'stk-modal' },
                       timer: 2400,
                       showConfirmButton: false,
                     }).then(() => {
                       if (isMountedRef.current) setLoading(false);
-                      navigate('/loan-processing', {
-                        replace: true,
-                        state: applicationPayload,
-                      });
+                      navigate('/loan-processing', { replace: true, state: applicationPayload });
                     });
-
                     return;
-                  } else if (
-                    statusResult.status === 'failed' ||
-                    statusResult.status === 'cancelled' ||
-                    statusResult.status === 'expired'
-                  ) {
-                    clearTimeout(paymentPollRef.current);
-                    requestLockRef.current = false; // 🔓 Release lock on failure
+                  }
 
+                  if (statusResult.status === 'failed' || statusResult.status === 'cancelled' || statusResult.status === 'expired') {
+                    clearTimeout(paymentPollRef.current);
+                    requestLockRef.current = false;
                     Swal.fire({
                       icon: 'warning',
                       title: 'Loan Not Processed',
@@ -761,18 +782,17 @@ const Loan = () => {
                     });
                     if (isMountedRef.current) setLoading(false);
                     return;
-                  } else if (attempts >= maxAttempts) {
-                    clearTimeout(paymentPollRef.current);
-                    requestLockRef.current = false; // 🔓 Release lock on timeout
+                  }
 
-                    Swal.fire(
-                      {
-                        icon: 'info',
-                        title: 'Confirmation Timeout',
-                        text: 'We could not confirm payment in time. If you completed payment, check your loan page in a minute.',
-                        confirmButtonColor: '#26c2a3',
-                      }
-                    );
+                  if (attempts >= maxAttempts) {
+                    clearTimeout(paymentPollRef.current);
+                    requestLockRef.current = false;
+                    Swal.fire({
+                      icon: 'info',
+                      title: 'Confirmation Timeout',
+                      text: 'We could not confirm payment in time. If you completed payment, check your loan page in a minute.',
+                      confirmButtonColor: '#26c2a3',
+                    });
                     if (isMountedRef.current) setLoading(false);
                     return;
                   }
@@ -797,26 +817,14 @@ const Loan = () => {
               };
 
               scheduleNextPoll(150);
-            } else {
-              // No active payment found, show the original wait message
-              console.log('[Loan] No active payment found');
-              Swal.fire({
-                icon: 'info',
-                title: 'Payment Request Already Active',
-                text: 'A secure M-Pesa payment request is already being processed. Please wait a moment before trying again.',
-                confirmButtonColor: '#26c2a3',
-              });
-              if (isMountedRef.current) setLoading(false);
+              return;
             }
+
+            console.log('[Loan] No active payment request found; continuing without showing duplicate warning');
+            if (isMountedRef.current) setLoading(true);
           } catch (recoveryError) {
-            console.error('[Loan] Payment recovery failed:', recoveryError);
-            Swal.fire({
-              icon: 'info',
-              title: 'Payment Request Already Active',
-              text: 'A secure M-Pesa payment request is already being processed. Please wait a moment before trying again.',
-              confirmButtonColor: '#26c2a3',
-            });
-            if (isMountedRef.current) setLoading(false);
+            console.warn('[Loan] Recovery fallback failed, continuing without duplicate modal:', recoveryError);
+            if (isMountedRef.current) setLoading(true);
           }
         })();
         return;
