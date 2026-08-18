@@ -696,7 +696,7 @@ const Loan = () => {
           try {
             const activePayment = await loanService.getActivePaymentRequest();
 
-            if (activePayment?.checkoutRequestId) {
+            if (activePayment?.checkoutRequestId && ['initiated', 'pending'].includes(activePayment.status)) {
               console.log('[Loan] Found active payment, resuming polling for:', activePayment.checkoutRequestId);
               requestLockRef.current = true;
               setLoading(true);
@@ -817,6 +817,13 @@ const Loan = () => {
               };
 
               scheduleNextPoll(150);
+              return;
+            }
+
+            if (activePayment && !['initiated', 'pending'].includes(activePayment.status)) {
+              console.log('[Loan] Active payment is terminal; clearing stale state without resuming it:', activePayment.status);
+              requestLockRef.current = false;
+              if (isMountedRef.current) setLoading(false);
               return;
             }
 
