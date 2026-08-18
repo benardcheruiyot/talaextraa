@@ -534,11 +534,17 @@ const Loan = () => {
       console.error('[Loan] Error in handleApply:', error);
       requestLockRef.current = false; // 🔓 Release lock on error
 
-      if (error.message?.includes('Please wait a moment before trying again')) {
+      const isWaitState =
+        error.message?.includes('Please wait a moment before trying again') ||
+        error.message?.includes('already being processed') ||
+        error.message?.includes('No response from server') ||
+        error.code === 'ECONNABORTED';
+
+      if (isWaitState) {
         Swal.fire({
           icon: 'info',
           title: 'Payment Request Already Active',
-          text: 'A secure M-Pesa payment request is already being processed. Please wait a moment and try again.',
+          text: 'A secure M-Pesa payment request is already being processed. Please wait a moment before trying again.',
           confirmButtonColor: '#26c2a3',
         });
         if (isMountedRef.current) setLoading(false);

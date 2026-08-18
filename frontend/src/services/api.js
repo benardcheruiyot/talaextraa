@@ -52,9 +52,9 @@ api.interceptors.response.use(
     } else if (error.request) {
       // Request made but no response
       console.error('[API Error] No response received:', error.request);
-      message = 'No response from server. Check your connection and try again.';
+      message = 'Payment request is already being processed or the server is warming up. Please wait a moment before trying again.';
     } else if (error.code === 'ECONNABORTED') {
-      message = 'Request timeout. The server took too long to respond.';
+      message = 'Payment request is already being processed or the server is warming up. Please wait a moment before trying again.';
     } else {
       message = error.message || 'Network error occurred';
     }
