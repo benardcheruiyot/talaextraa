@@ -64,6 +64,11 @@ mpesaTransactionSchema.index(
 let MpesaTransactionModel = null;
 
 const getModel = () => {
+  // Check if connection is ready
+  if (mongoose.connection.readyState !== 1) {
+    throw new Error('MongoDB not connected. Connection state: ' + mongoose.connection.readyState);
+  }
+  
   if (!MpesaTransactionModel) {
     if (mongoose.models.MpesaTransaction) {
       MpesaTransactionModel = mongoose.models.MpesaTransaction;
@@ -94,7 +99,7 @@ class MpesaTransaction {
       return transaction ? this.expireIfPending(transaction) : null;
     } catch (error) {
       console.error('[MpesaTransaction.findByCheckoutRequestId] Error:', error.message);
-      return null;
+      throw error;
     }
   }
 
@@ -120,7 +125,7 @@ class MpesaTransaction {
       return await transaction.save();
     } catch (error) {
       console.error('[MpesaTransaction.updateByCheckoutRequestId] Error:', error.message);
-      return null;
+      throw error;
     }
   }
 
@@ -133,7 +138,7 @@ class MpesaTransaction {
       return transaction ? this.expireIfPending(transaction) : null;
     } catch (error) {
       console.error('[MpesaTransaction.findLastByUserId] Error:', error.message);
-      return null;
+      throw error;
     }
   }
 
@@ -144,7 +149,7 @@ class MpesaTransaction {
       return await model.find({ userId }).sort({ createdAt: -1 });
     } catch (error) {
       console.error('[MpesaTransaction.getAllByUserId] Error:', error.message);
-      return [];
+      throw error;
     }
   }
 
@@ -172,7 +177,7 @@ class MpesaTransaction {
 
   static async purgeStaleTransactions() {
     try {
-      const model = mongoose.model('MpesaTransaction', mpesaTransactionSchema);
+      const model = getModel();
       const TERMINAL_RETENTION_MS = 30 * 60 * 1000;
       const cutoffDate = new Date(Date.now() - TERMINAL_RETENTION_MS);
 
@@ -182,6 +187,7 @@ class MpesaTransaction {
       });
     } catch (error) {
       console.error('[MpesaTransaction.purgeStaleTransactions] Error:', error.message);
+      throw error;
     }
   }
 }

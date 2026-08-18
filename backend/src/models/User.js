@@ -34,6 +34,11 @@ const userSchema = new mongoose.Schema(
 let UserModel = null;
 
 const getModel = () => {
+  // Check if connection is ready
+  if (mongoose.connection.readyState !== 1) {
+    throw new Error('MongoDB not connected. Connection state: ' + mongoose.connection.readyState);
+  }
+  
   if (!UserModel) {
     if (mongoose.models.User) {
       UserModel = mongoose.models.User;
@@ -66,7 +71,7 @@ class User {
       return await model.findOne({ phone_number: phone });
     } catch (error) {
       console.error('[User.findByPhone] Error:', error.message);
-      return null;
+      throw error;
     }
   }
 
@@ -76,7 +81,7 @@ class User {
       return await model.findById(id);
     } catch (error) {
       console.error('[User.findById] Error:', error.message);
-      return null;
+      throw error;
     }
   }
 

@@ -48,6 +48,11 @@ const loanSchema = new mongoose.Schema(
 let LoanModel = null;
 
 const getModel = () => {
+  // Check if connection is ready
+  if (mongoose.connection.readyState !== 1) {
+    throw new Error('MongoDB not connected. Connection state: ' + mongoose.connection.readyState);
+  }
+  
   if (!LoanModel) {
     if (mongoose.models.Loan) {
       LoanModel = mongoose.models.Loan;
@@ -76,7 +81,7 @@ class Loan {
       return await model.findById(id);
     } catch (error) {
       console.error('[Loan.findById] Error:', error.message);
-      return null;
+      throw error;
     }
   }
 
@@ -87,7 +92,7 @@ class Loan {
       return await model.find({ userId });
     } catch (error) {
       console.error('[Loan.findByUserId] Error:', error.message);
-      return [];
+      throw error;
     }
   }
 
@@ -110,7 +115,7 @@ class Loan {
       return await loan.save();
     } catch (error) {
       console.error('[Loan.updateStatus] Error:', error.message);
-      return null;
+      throw error;
     }
   }
 }

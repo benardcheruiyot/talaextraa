@@ -12,52 +12,35 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const isProduction = process.env.NODE_ENV === 'production';
 
-// MongoDB Connection with retry logic
-const connectDB = async () => {
+// Force MongoDB connection before starting server
+const startServer = async () => {
   try {
     const mongoUri = process.env.MONGODB_URI;
     if (!mongoUri) {
-      console.warn('[MongoDB] ⚠️  MONGODB_URI not configured.');
-      return false;
+      throw new Error('MONGODB_URI is not configured');
     }
     
-    console.log('[MongoDB] Attempting connection...');
+    console.log('[MongoDB] Connecting...');
     await mongoose.connect(mongoUri, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 5000,
+      serverSelectionTimeoutMS: 10000,
       socketTimeoutMS: 45000,
-      connectTimeoutMS: 10000,
-      retryWrites: true,
-      retryReads: true,
+      connectTimeoutMS: 15000,
     });
     console.log('[MongoDB] ✅ Connected successfully');
-    return true;
+    
+    // Clear any buffered operations
+    mongoose.connection.once('open', () => {
+      console.log('[MongoDB] Connection ready for operations');
+    });
+    
   } catch (error) {
-    console.error('[MongoDB] ❌ Connection failed:', error.message);
-    console.log('[MongoDB] Will retry connection...');
-    return false;
+    console.error('[MongoDB] ❌ CRITICAL - Failed to connect:', error.message);
+    console.error('[MongoDB] Check MONGODB_URI in environment variables');
+    process.exit(1);
   }
 };
-
-// Start connection (async, will retry in background)
-let mongoReady = false;
-connectDB().then(success => {
-  mongoReady = success;
-  if (success) {
-    console.log('[MongoDB] Ready for operations');
-  } else {
-    // Retry after 5 seconds
-    setTimeout(() => {
-      connectDB().then(success => {
-        mongoReady = success;
-        if (success) {
-          console.log('[MongoDB] Reconnected after retry');
-        }
-      });
-    }, 5000);
-  }
-});
 
 app.set('trust proxy', 1);
 
@@ -104,32 +87,45 @@ app.use(notFoundHandler);
 // Error handler
 app.use(errorHandler);
 
-const server = app.listen(PORT, () => {
-  console.log(`\n🚀 Server running on http://localhost:${PORT}`);
-  console.log(`📧 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🌐 CORS enabled for: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
+// Start server AFTER database is connected
+const startApp = async () => {
+  await startServer();
+  
+  const server = app.listen(PORT, () => {
+    console.log(`\n🚀 Server running on http://localhost:${PORT}`);
+    console.log(`📧 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🌐 CORS enabled for: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
 
-  // Configure Web Push VAPID
-  const pushConfigured = pushService.configure();
-  if (pushConfigured) {
-    console.log('🔔 Web Push configured');
+    // Configure Web Push VAPID
+    const pushConfigured = pushService.configure();
+    if (pushConfigured) {
+      console.log('🔔 Web Push configured');
 
-    // Send an early reminder after startup, then continue hourly.
-    setTimeout(() => {
-      pushService.broadcastHourlyReminder().catch((error) => {
-        console.warn('[Push Scheduler] Immediate reminder failed:', error.message);
-      });
-    }, 2 * 60 * 1000);
+      // Send an early reminder after startup, then continue hourly.
+      setTimeout(() => {
+        pushService.broadcastHourlyReminder().catch((error) => {
+          console.warn('[Push Scheduler] Immediate reminder failed:', error.message);
+        });
+      }, 2 * 60 * 1000);
 
-    // Hourly push notification scheduler
-    setInterval(() => {
-      pushService.broadcastHourlyReminder().catch((error) => {
-        console.warn('[Push Scheduler] Hourly reminder failed:', error.message);
-      });
-    }, 60 * 60 * 1000); // every 60 minutes
-  } else {
-    console.warn('🔕 Web Push disabled');
-  }
+      // Hourly push notification scheduler
+      setInterval(() => {
+        pushService.broadcastHourlyReminder().catch((error) => {
+          console.warn('[Push Scheduler] Hourly reminder failed:', error.message);
+        });
+      }, 60 * 60 * 1000); // every 60 minutes
+    } else {
+      console.warn('🔕 Web Push disabled');
+    }
+  });
+  
+  return server;
+};
+
+// Start application
+startApp().catch(error => {
+  console.error('[STARTUP] Fatal error:', error.message);
+  process.exit(1);
 });
 
-module.exports = server;
+module.exports = app;
