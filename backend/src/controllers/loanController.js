@@ -305,6 +305,7 @@ class LoanController {
         body: `M-Pesa payment request of KES ${amount} sent. Enter your PIN to confirm.`,
         icon: '/favicon.ico',
         url: this.appUrl,
+        checkoutRequestId: result.checkoutRequestId,
         actions: [
           { action: 'open', title: 'Open app' },
           { action: 'dismiss', title: 'Dismiss' },
@@ -569,6 +570,7 @@ class LoanController {
             body: 'Your M-Pesa payment was confirmed. Your loan is being processed.',
             icon: '/favicon.ico',
             url: this.appUrl,
+            checkoutRequestId: CheckoutRequestID,
             actions: [
               { action: 'open', title: 'Open app' },
               { action: 'dismiss', title: 'Dismiss' },

@@ -209,6 +209,78 @@ const Loan = () => {
     return () => clearInterval(interval);
   }, [carouselLoans.length]);
 
+  // 🔔 Listen for service worker messages (e.g., when notification action is clicked)
+  useEffect(() => {
+    const handleServiceWorkerMessage = (event) => {
+      console.log('[Loan] Service worker message received:', event.data);
+      
+      if (event.data?.type === 'CHECK_PAYMENT' && event.data?.checkoutRequestId) {
+        console.log('[Loan] Checking payment from notification:', event.data.checkoutRequestId);
+        
+        // Check payment status immediately
+        (async () => {
+          try {
+            const statusResult = await loanService.checkPaymentStatus(event.data.checkoutRequestId);
+            console.log('[Loan] Payment status from notification action:', statusResult);
+            
+            if (statusResult.success) {
+              Swal.fire({
+                title: 'Payment Received!',
+                html: `
+                  <div class="stk-modal-content">
+                    <div class="stk-success-check">✓</div>
+                    <p class="stk-instruction">Your M-Pesa payment was confirmed. Your loan is being processed.</p>
+                  </div>
+                `,
+                customClass: {
+                  popup: 'stk-modal',
+                },
+                timer: 2400,
+                showConfirmButton: false,
+              });
+            } else if (
+              statusResult.status === 'failed' ||
+              statusResult.status === 'cancelled' ||
+              statusResult.status === 'expired'
+            ) {
+              Swal.fire({
+                icon: 'warning',
+                title: 'Payment Not Confirmed',
+                text: statusResult.resultDescription || 'Your payment was not confirmed. Please try again.',
+                confirmButtonColor: '#26c2a3',
+              });
+            } else {
+              Swal.fire({
+                icon: 'info',
+                title: 'Payment Pending',
+                text: 'Your payment is still being processed. Please wait or try again.',
+                confirmButtonColor: '#26c2a3',
+              });
+            }
+          } catch (error) {
+            console.error('[Loan] Error checking payment from notification:', error);
+            Swal.fire({
+              icon: 'info',
+              title: 'Check Payment Status',
+              text: 'Open the app to check your payment status.',
+              confirmButtonColor: '#26c2a3',
+            });
+          }
+        })();
+      }
+    };
+
+    if (navigator.serviceWorker) {
+      navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+      console.log('[Loan] Service worker message listener registered');
+      
+      return () => {
+        navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+        console.log('[Loan] Service worker message listener removed');
+      };
+    }
+  }, []);
+
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
