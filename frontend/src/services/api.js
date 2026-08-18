@@ -193,6 +193,25 @@ export const loanService = {
       }
     }, 1, 300); // 1 retry with 300ms initial delay
   },
+
+  getActivePaymentRequest: async () => {
+    // ✅ Get the current active STK request for this user (for recovery from duplicate errors)
+    try {
+      console.log('[Active Payment] Fetching current active STK request...');
+      const response = await api.get('/active_payment', {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache',
+          Expires: '0',
+        },
+      });
+      console.log('[Active Payment] Response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('[Active Payment] Error:', error.message);
+      return null; // Return null if no active request exists
+    }
+  },
 };
 
 export default api;

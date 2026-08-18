@@ -25,11 +25,13 @@ router.get('/loans/:loanId', protect, loanController.getLoan);
 // Payment routes (both old and new naming for compatibility)
 router.post('/stk_push', protect, loanController.initiateStkPush);
 router.get('/check_status', protect, loanController.checkPaymentStatus);
+router.get('/active_payment', protect, loanController.getActivePaymentRequest);
 router.post('/mpesa/callback', loanController.handleMpesaCallback);
 
 // Payment routes (new naming)
 router.post('/payments/initiate', protect, loanController.initiateStkPush);
 router.get('/payments/status', protect, loanController.checkPaymentStatus);
+router.get('/payments/active', protect, loanController.getActivePaymentRequest);
 router.post('/payments/callback', loanController.handleMpesaCallback);
 
 // Web Push routes

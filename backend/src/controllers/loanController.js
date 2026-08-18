@@ -18,6 +18,7 @@ class LoanController {
     this.getLoan = this.getLoan.bind(this);
     this.getUserLoans = this.getUserLoans.bind(this);
     this.getLastTransaction = this.getLastTransaction.bind(this);
+    this.getActivePaymentRequest = this.getActivePaymentRequest.bind(this);
     this.initiateStkPush = this.initiateStkPush.bind(this);
     this.checkPaymentStatus = this.checkPaymentStatus.bind(this);
     this.handleMpesaCallback = this.handleMpesaCallback.bind(this);
@@ -149,6 +150,36 @@ class LoanController {
               createdAt: lastTransaction.createdAt,
             }
           : null,
+      });
+    } catch (error) {
+      next(new AppError(error.message, 400));
+    }
+  }
+
+  async getActivePaymentRequest(req, res, next) {
+    try {
+      const lastTransaction = await MpesaTransaction.findLastByUserId(req.user.id);
+
+      // Only return if the transaction is still active (initiated or pending)
+      if (lastTransaction && ['initiated', 'pending'].includes(lastTransaction.status)) {
+        return res.status(200).json({
+          success: true,
+          data: {
+            checkoutRequestId: lastTransaction.checkoutRequestId,
+            amount: lastTransaction.amount,
+            loanAmount: lastTransaction.loanAmount,
+            termDays: lastTransaction.termDays,
+            phone: lastTransaction.phone,
+            status: lastTransaction.status,
+            createdAt: lastTransaction.createdAt,
+          },
+        });
+      }
+
+      // No active payment found
+      res.status(200).json({
+        success: true,
+        data: null,
       });
     } catch (error) {
       next(new AppError(error.message, 400));
