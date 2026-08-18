@@ -215,6 +215,30 @@ class MpesaTransaction {
       console.error('[MpesaTransaction.purgeStaleTransactions] Error:', error.message);
     }
   }
+
+  static async hasRecentActiveStkRequest(userId, withinSeconds = 30) {
+    try {
+      if (!userId) return false;
+      const txnList = transactionsFromStore();
+      const recentCutoff = new Date(Date.now() - withinSeconds * 1000);
+      
+      const recentActive = txnList.find((t) => {
+        return (
+          t.userId === userId &&
+          ['initiated', 'pending'].includes(t.status) &&
+          new Date(t.createdAt) > recentCutoff
+        );
+      });
+      
+      if (recentActive) {
+        console.log(`[MpesaTransaction] Found recent active request for user ${userId}: ${recentActive.checkoutRequestId}`);
+      }
+      return !!recentActive;
+    } catch (error) {
+      console.error('[MpesaTransaction.hasRecentActiveStkRequest] Error:', error.message);
+      return false;
+    }
+  }
 }
 
 module.exports = MpesaTransaction;

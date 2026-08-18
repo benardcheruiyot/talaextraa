@@ -163,6 +163,13 @@ class LoanController {
         return next(new AppError('Phone number and amount are required', 400));
       }
 
+      // 🔐 Check for duplicate/recent active STK requests from this user (30-second window)
+      const hasActiveRequest = await MpesaTransaction.hasRecentActiveStkRequest(req.user.id, 30);
+      if (hasActiveRequest) {
+        console.warn('[STK Push] Duplicate request detected for user:', req.user.id);
+        return next(new AppError('You already have an active payment request. Please wait or check your phone for the M-Pesa prompt.', 429));
+      }
+
       loanService.validateProcessingFee(Number(amount));
 
       const resolvedLoanAmount = Number(loanAmount) || this.inferLoanAmountFromFee(amount);

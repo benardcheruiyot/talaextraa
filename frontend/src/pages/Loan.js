@@ -59,6 +59,7 @@ const Loan = () => {
   const paymentPollRef = useRef(null);
   const isMountedRef = useRef(true);
   const autoRetryUsedRef = useRef(false);
+  const requestLockRef = useRef(false); // 🔐 Synchronous lock to prevent duplicate requests
   const [selectedLoan, setSelectedLoan] = useState(null);
   const [loading, setLoading] = useState(false);
   const [recentIndex, setRecentIndex] = useState(0);
@@ -230,8 +231,14 @@ const Loan = () => {
       return;
     }
 
-    if (loading) return; // Prevent duplicate clicks
-    
+    // 🔐 CRITICAL: Use ref-based lock to prevent duplicate submissions (synchronous check)
+    if (requestLockRef.current === true) {
+      console.warn('[Loan] Request already in progress, ignoring duplicate click');
+      return;
+    }
+
+    // Set lock IMMEDIATELY (synchronous) before state update
+    requestLockRef.current = true;
     setLoading(true);
     autoRetryUsedRef.current = false;
 
@@ -271,6 +278,7 @@ const Loan = () => {
       });
 
       if (!isConfirmed) {
+        requestLockRef.current = false;
         if (isMountedRef.current) setLoading(false);
         return;
       }
@@ -295,6 +303,7 @@ const Loan = () => {
       });
 
       // Initiate STK Push
+      console.log('[Loan] About to call initiateStkPush with lock:', requestLockRef.current);
       const result = await loanService.initiateStkPush(
         user.phone_number,
         selectedLoan.fee,
@@ -366,6 +375,7 @@ const Loan = () => {
 
           if (statusResult.success) {
             clearTimeout(paymentPollRef.current);
+            requestLockRef.current = false; // 🔓 Release lock on success
 
             const applicationPayload = formatLoanReceipt(selectedLoan, checkoutReference, user);
             localStorage.setItem('pending_loan_application', JSON.stringify(applicationPayload));
@@ -397,6 +407,7 @@ const Loan = () => {
             statusResult.status === 'cancelled' ||
             statusResult.status === 'expired'
           ) {
+            requestLockRef.current = false; // 🔓 Release lock on failure
             const description = String(statusResult.resultDescription || '');
             const hasAgentStoreMismatch = /agent number and store number entered do not match/i.test(description);
 
@@ -437,6 +448,7 @@ const Loan = () => {
             }
 
             clearTimeout(paymentPollRef.current);
+            requestLockRef.current = false; // 🔓 Release lock on failure
             Swal.fire({
               icon: 'warning',
               title: 'Loan Not Processed',
@@ -451,6 +463,7 @@ const Loan = () => {
             try {
               const finalStatusResult = await loanService.checkPaymentStatus(checkoutReference);
               if (finalStatusResult?.success) {
+                requestLockRef.current = false; // 🔓 Release lock
                 const applicationPayload = formatLoanReceipt(selectedLoan, checkoutReference, user);
                 localStorage.setItem('pending_loan_application', JSON.stringify(applicationPayload));
 
@@ -480,6 +493,7 @@ const Loan = () => {
               console.warn('Final status check after timeout failed:', finalCheckError);
             }
 
+            requestLockRef.current = false; // 🔓 Release lock on timeout
             Swal.fire(
               {
                 icon: 'info',
@@ -517,6 +531,8 @@ const Loan = () => {
       // Start almost immediately, then continue with sequential polling.
       scheduleNextPoll(150);
     } catch (error) {
+      console.error('[Loan] Error in handleApply:', error);
+      requestLockRef.current = false; // 🔓 Release lock on error
       Swal.fire({
         icon: 'error',
         title: 'Payment Prompt Failed',
