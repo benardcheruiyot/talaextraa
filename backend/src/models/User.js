@@ -1,42 +1,69 @@
-// User Model
+// User Model - MongoDB
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const { getJwtSecret, getJwtExpiresIn } = require('../utils/jwtSecret');
 
-// In-memory store for demo (replace with MongoDB in production)
-const users = new Map();
+const userSchema = new mongoose.Schema(
+  {
+    name: String,
+    email: {
+      type: String,
+      lowercase: true,
+      trim: true,
+      index: true,
+    },
+    phone_number: {
+      type: String,
+      required: true,
+      unique: true,
+      index: true,
+    },
+    password: {
+      type: String,
+      required: true,
+      select: false,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
 
 class User {
-  constructor(data) {
-    this.id = data.id;
-    this.name = data.name;
-    this.email = data.email;
-    this.phone_number = data.phone_number;
-    this.password = data.password;
-    this.createdAt = new Date();
-    this.updatedAt = new Date();
-  }
-
   static async create(data) {
-    const hashedPassword = await bcrypt.hash(data.password, 10);
-    const user = new User({
-      ...data,
-      id: Date.now().toString(),
-      password: hashedPassword,
-    });
-    users.set(user.id, user);
-    return user;
+    try {
+      const model = mongoose.model('User', userSchema);
+      const hashedPassword = await bcrypt.hash(data.password, 10);
+      const user = new model({
+        ...data,
+        password: hashedPassword,
+      });
+      return await user.save();
+    } catch (error) {
+      console.error('[User.create] Error:', error.message);
+      throw error;
+    }
   }
 
   static async findByPhone(phone) {
-    for (let user of users.values()) {
-      if (user.phone_number === phone) return user;
+    try {
+      const model = mongoose.model('User', userSchema);
+      return await model.findOne({ phone_number: phone });
+    } catch (error) {
+      console.error('[User.findByPhone] Error:', error.message);
+      return null;
     }
-    return null;
   }
 
   static async findById(id) {
-    return users.get(id) || null;
+    try {
+      const model = mongoose.model('User', userSchema);
+      return await model.findById(id);
+    } catch (error) {
+      console.error('[User.findById] Error:', error.message);
+      return null;
+    }
   }
 
   async comparePassword(password) {
@@ -45,14 +72,14 @@ class User {
 
   generateToken() {
     return jwt.sign(
-      { id: this.id, phone: this.phone_number },
+      { id: this._id, phone: this.phone_number },
       getJwtSecret(),
       { expiresIn: getJwtExpiresIn() }
     );
   }
 
   toJSON() {
-    const { password, ...user } = this;
+    const { password, ...user } = this.toObject();
     return user;
   }
 }

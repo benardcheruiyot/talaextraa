@@ -1,108 +1,103 @@
-// Loan Model
-const fs = require('fs');
-const path = require('path');
+// Loan Model - MongoDB
+const mongoose = require('mongoose');
 
-const STORE_DIR = process.env.TALA_EXTRA_MODEL_STORE_DIR || path.resolve(__dirname, '../../data');
-const STORE_FILE = path.join(STORE_DIR, 'loans.json');
-
-const ensureStore = () => {
-  fs.mkdirSync(STORE_DIR, { recursive: true });
-  if (!fs.existsSync(STORE_FILE)) {
-    fs.writeFileSync(STORE_FILE, JSON.stringify({ loans: [] }, null, 2));
+const loanSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: String,
+      required: true,
+      index: true,
+    },
+    amount: {
+      type: Number,
+      required: true,
+    },
+    processingFee: {
+      type: Number,
+      default: 0,
+    },
+    interestRate: {
+      type: Number,
+      default: 0.1,
+    },
+    termDays: {
+      type: Number,
+      default: 30,
+    },
+    status: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected', 'disbursed'],
+      default: 'pending',
+      index: true,
+    },
+    paymentStatus: {
+      type: String,
+      enum: ['unpaid', 'completed', 'overdue'],
+      default: 'unpaid',
+    },
+    mpesaReference: String,
+    disbursedAt: Date,
+    repaymentDueDate: Date,
+  },
+  {
+    timestamps: true,
   }
-};
-
-const readStore = () => {
-  ensureStore();
-  const raw = fs.readFileSync(STORE_FILE, 'utf8');
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed.loans) ? parsed.loans : [];
-  } catch {
-    return [];
-  }
-};
-
-const writeStore = (loans) => {
-  ensureStore();
-  fs.writeFileSync(STORE_FILE, JSON.stringify({ loans }, null, 2));
-};
-
-const loansFromStore = () => {
-  return readStore().map((loan) => ({
-    ...loan,
-    createdAt: loan.createdAt ? new Date(loan.createdAt) : new Date(),
-    updatedAt: loan.updatedAt ? new Date(loan.updatedAt) : new Date(),
-    disbursedAt: loan.disbursedAt ? new Date(loan.disbursedAt) : null,
-    repaymentDueDate: loan.repaymentDueDate ? new Date(loan.repaymentDueDate) : null,
-  }));
-};
-
-const persistLoans = (loanList) => {
-  writeStore(loanList.map((loan) => ({
-    ...loan,
-    createdAt: loan.createdAt instanceof Date ? loan.createdAt.toISOString() : loan.createdAt,
-    updatedAt: loan.updatedAt instanceof Date ? loan.updatedAt.toISOString() : loan.updatedAt,
-    disbursedAt: loan.disbursedAt instanceof Date ? loan.disbursedAt.toISOString() : loan.disbursedAt,
-    repaymentDueDate: loan.repaymentDueDate instanceof Date ? loan.repaymentDueDate.toISOString() : loan.repaymentDueDate,
-  })));
-};
+);
 
 class Loan {
-  constructor(data) {
-    this.id = data.id;
-    this.userId = data.userId;
-    this.amount = data.amount;
-    this.processingFee = data.processingFee;
-    this.interestRate = data.interestRate;
-    this.termDays = data.termDays;
-    this.status = data.status || 'pending';
-    this.paymentStatus = data.paymentStatus || 'unpaid';
-    this.mpesaReference = data.mpesaReference || null;
-    this.disbursedAt = null;
-    this.repaymentDueDate = null;
-    this.createdAt = new Date();
-    this.updatedAt = new Date();
-  }
-
   static async create(data) {
-    const loanList = loansFromStore();
-    const loan = new Loan({
-      ...data,
-      id: `LOAN-${Date.now()}`,
-    });
-    loanList.push(loan);
-    persistLoans(loanList);
-    return loan;
+    try {
+      const model = mongoose.model('Loan', loanSchema);
+      const loan = new model(data);
+      return await loan.save();
+    } catch (error) {
+      console.error('[Loan.create] Error:', error.message);
+      throw error;
+    }
   }
 
   static async findById(id) {
-    const loanList = loansFromStore();
-    return loanList.find((loan) => loan.id === id) || null;
+    try {
+      const model = mongoose.model('Loan', loanSchema);
+      return await model.findById(id);
+    } catch (error) {
+      console.error('[Loan.findById] Error:', error.message);
+      return null;
+    }
   }
 
   static async findByUserId(userId) {
-    const loanList = loansFromStore();
-    return loanList.filter((loan) => loan.userId === userId);
+    try {
+      if (!userId) return [];
+      const model = mongoose.model('Loan', loanSchema);
+      return await model.find({ userId });
+    } catch (error) {
+      console.error('[Loan.findByUserId] Error:', error.message);
+      return [];
+    }
   }
 
   static async updateStatus(loanId, status, paymentReference) {
-    const loanList = loansFromStore();
-    const loan = loanList.find((item) => item.id === loanId);
-    if (loan) {
+    try {
+      const model = mongoose.model('Loan', loanSchema);
+      const loan = await model.findById(loanId);
+
+      if (!loan) return null;
+
       loan.status = status;
       loan.paymentStatus = 'completed';
       loan.mpesaReference = paymentReference;
-      loan.updatedAt = new Date();
+
       if (status === 'approved') {
         loan.disbursedAt = new Date();
-        loan.repaymentDueDate = new Date(
-          Date.now() + loan.termDays * 24 * 60 * 60 * 1000
-        );
+        loan.repaymentDueDate = new Date(Date.now() + loan.termDays * 24 * 60 * 60 * 1000);
       }
-      persistLoans(loanList);
+
+      return await loan.save();
+    } catch (error) {
+      console.error('[Loan.updateStatus] Error:', error.message);
+      return null;
     }
-    return loan;
   }
 }
 

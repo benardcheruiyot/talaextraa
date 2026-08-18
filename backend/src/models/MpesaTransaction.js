@@ -1,97 +1,137 @@
-﻿const fs = require('fs');
-const path = require('path');
+﻿// M-Pesa Transaction Model - MongoDB
+const mongoose = require('mongoose');
 
-const STORE_DIR = process.env.TALA_EXTRA_MODEL_STORE_DIR || path.resolve(__dirname, '../../data');
-const STORE_FILE = path.join(STORE_DIR, 'mpesa-transactions.json');
-const PENDING_EXPIRY_MS = 5 * 60 * 1000;
-const TERMINAL_RETENTION_MS = 30 * 60 * 1000;
-
-const ensureStore = () => {
-  fs.mkdirSync(STORE_DIR, { recursive: true });
-  if (!fs.existsSync(STORE_FILE)) {
-    fs.writeFileSync(STORE_FILE, JSON.stringify({ transactions: [] }, null, 2));
+const mpesaTransactionSchema = new mongoose.Schema(
+  {
+    checkoutRequestId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      index: true,
+    },
+    merchantRequestId: String,
+    userId: {
+      type: String,
+      index: true,
+    },
+    phone: String,
+    loanAmount: Number,
+    termDays: {
+      type: Number,
+      default: 60,
+    },
+    amount: Number,
+    accountReference: String,
+    status: {
+      type: String,
+      enum: ['initiated', 'completed', 'failed', 'cancelled', 'expired'],
+      default: 'initiated',
+      index: true,
+    },
+    resultCode: String,
+    resultDescription: String,
+    mpesaReceiptNumber: String,
+    callbackData: mongoose.Schema.Types.Mixed,
+    loanId: String,
+    loanCreatedAt: Date,
+    rawRequest: mongoose.Schema.Types.Mixed,
+    rawResponse: mongoose.Schema.Types.Mixed,
+    lastStatusQueryAt: Date,
+    completedAt: Date,
+    expiresAt: {
+      type: Date,
+      default: () => new Date(Date.now() + 5 * 60 * 1000),
+      index: true,
+    },
+  },
+  {
+    timestamps: true,
   }
-};
+);
 
-const readStore = () => {
-  ensureStore();
-  const raw = fs.readFileSync(STORE_FILE, 'utf8');
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed.transactions) ? parsed.transactions : [];
-  } catch {
-    return [];
+// TTL index to auto-delete expired transactions after 30 minutes in terminal state
+mpesaTransactionSchema.index(
+  { completedAt: 1 },
+  {
+    expireAfterSeconds: 1800,
+    partialFilterExpression: {
+      status: { $in: ['completed', 'failed', 'cancelled', 'expired'] },
+    },
   }
-};
-
-const writeStore = (transactions) => {
-  ensureStore();
-  fs.writeFileSync(STORE_FILE, JSON.stringify({ transactions }, null, 2));
-};
-
-const transactionList = () => {
-  return readStore().map((transaction) => ({
-    ...transaction,
-    createdAt: transaction.createdAt ? new Date(transaction.createdAt) : new Date(),
-    updatedAt: transaction.updatedAt ? new Date(transaction.updatedAt) : new Date(),
-    completedAt: transaction.completedAt ? new Date(transaction.completedAt) : null,
-    loanCreatedAt: transaction.loanCreatedAt ? new Date(transaction.loanCreatedAt) : null,
-    expiresAt: transaction.expiresAt ? new Date(transaction.expiresAt) : new Date(),
-  }));
-};
+);
 
 class MpesaTransaction {
-  constructor(data) {
-    this.id = data.id;
-    this.checkoutRequestId = data.checkoutRequestId || null;
-    this.merchantRequestId = data.merchantRequestId || null;
-    this.phone = data.phone || null;
-    this.userId = data.userId || null;
-    this.loanAmount = data.loanAmount || null;
-    this.termDays = data.termDays || 60;
-    this.amount = data.amount || null;
-    this.accountReference = data.accountReference || null;
-    this.status = data.status || 'initiated';
-    this.resultCode = data.resultCode || null;
-    this.resultDescription = data.resultDescription || null;
-    this.mpesaReceiptNumber = data.mpesaReceiptNumber || null;
-    this.callbackData = data.callbackData || null;
-    this.loanId = data.loanId || null;
-    this.loanCreatedAt = data.loanCreatedAt || null;
-    this.rawRequest = data.rawRequest || null;
-    this.rawResponse = data.rawResponse || null;
-    this.lastStatusQueryAt = data.lastStatusQueryAt || null;
-    this.createdAt = new Date();
-    this.updatedAt = new Date();
-    this.completedAt = null;
-    this.expiresAt = new Date(this.createdAt.getTime() + PENDING_EXPIRY_MS);
+  static async create(data) {
+    try {
+      const model = mongoose.model('MpesaTransaction', mpesaTransactionSchema);
+      const transaction = new model(data);
+      return await transaction.save();
+    } catch (error) {
+      console.error('[MpesaTransaction.create] Error:', error.message);
+      throw error;
+    }
   }
 
-  static purgeStaleTransactions() {
-    const now = Date.now();
-    const transactions = transactionList();
-    const activeTransactions = [];
-
-    for (const transaction of transactions) {
-      if (!transaction) {
-        continue;
-      }
-
-      const terminal = ['completed', 'failed', 'cancelled', 'expired'].includes(transaction.status);
-      if (terminal) {
-        const terminalAt = transaction.completedAt
-          ? new Date(transaction.completedAt).getTime()
-          : new Date(transaction.updatedAt || transaction.createdAt).getTime();
-
-        if (now - terminalAt > TERMINAL_RETENTION_MS) {
-          continue;
-        }
-      }
-
-      activeTransactions.push(transaction);
+  static async findByCheckoutRequestId(checkoutRequestId) {
+    try {
+      if (!checkoutRequestId) return null;
+      const model = mongoose.model('MpesaTransaction', mpesaTransactionSchema);
+      const transaction = await model.findOne({ checkoutRequestId });
+      return transaction ? this.expireIfPending(transaction) : null;
+    } catch (error) {
+      console.error('[MpesaTransaction.findByCheckoutRequestId] Error:', error.message);
+      return null;
     }
+  }
 
-    writeStore(activeTransactions);
+  static async updateByCheckoutRequestId(checkoutRequestId, patch) {
+    try {
+      if (!checkoutRequestId) return null;
+      const model = mongoose.model('MpesaTransaction', mpesaTransactionSchema);
+
+      const transaction = await model.findOne({ checkoutRequestId });
+      if (!transaction) return null;
+
+      if (transaction.status === 'expired') {
+        return transaction;
+      }
+
+      Object.assign(transaction, patch);
+      transaction.updatedAt = new Date();
+
+      if (patch.status && ['completed', 'failed', 'cancelled', 'expired'].includes(patch.status)) {
+        transaction.completedAt = new Date();
+      }
+
+      return await transaction.save();
+    } catch (error) {
+      console.error('[MpesaTransaction.updateByCheckoutRequestId] Error:', error.message);
+      return null;
+    }
+  }
+
+  static async findLastByUserId(userId) {
+    try {
+      if (!userId) return null;
+      const model = mongoose.model('MpesaTransaction', mpesaTransactionSchema);
+      const transaction = await model.findOne({ userId }).sort({ createdAt: -1 });
+
+      return transaction ? this.expireIfPending(transaction) : null;
+    } catch (error) {
+      console.error('[MpesaTransaction.findLastByUserId] Error:', error.message);
+      return null;
+    }
+  }
+
+  static async getAllByUserId(userId) {
+    try {
+      if (!userId) return [];
+      const model = mongoose.model('MpesaTransaction', mpesaTransactionSchema);
+      return await model.find({ userId }).sort({ createdAt: -1 });
+    } catch (error) {
+      console.error('[MpesaTransaction.getAllByUserId] Error:', error.message);
+      return [];
+    }
   }
 
   static expireIfPending(transaction) {
@@ -101,91 +141,34 @@ class MpesaTransaction {
       return transaction;
     }
 
+    const PENDING_EXPIRY_MS = 5 * 60 * 1000;
     const createdAtMs = new Date(transaction.createdAt).getTime();
+
     if (Date.now() - createdAtMs >= PENDING_EXPIRY_MS) {
       transaction.status = 'expired';
       transaction.resultCode = transaction.resultCode || 'TIMEOUT';
       transaction.resultDescription =
         transaction.resultDescription || 'Transaction expired after 5 minutes without confirmation.';
-      transaction.updatedAt = new Date();
       transaction.completedAt = new Date();
+      transaction.save().catch(err => console.error('Error saving expired transaction:', err));
     }
 
     return transaction;
   }
 
-  static async create(data) {
-    MpesaTransaction.purgeStaleTransactions();
+  static async purgeStaleTransactions() {
+    try {
+      const model = mongoose.model('MpesaTransaction', mpesaTransactionSchema);
+      const TERMINAL_RETENTION_MS = 30 * 60 * 1000;
+      const cutoffDate = new Date(Date.now() - TERMINAL_RETENTION_MS);
 
-    const transaction = new MpesaTransaction({
-      ...data,
-      id: `MPESA-${Date.now()}`,
-    });
-
-    const transactions = transactionList();
-    transactions.push(transaction);
-    writeStore(transactions);
-    return transaction;
-  }
-
-  static async findByCheckoutRequestId(checkoutRequestId) {
-    if (!checkoutRequestId) return null;
-    MpesaTransaction.purgeStaleTransactions();
-
-    const transaction = transactionList().find((item) => item.checkoutRequestId === checkoutRequestId) || null;
-    return transaction ? MpesaTransaction.expireIfPending(transaction) : null;
-  }
-
-  static async updateByCheckoutRequestId(checkoutRequestId, patch) {
-    MpesaTransaction.purgeStaleTransactions();
-
-    const transactions = transactionList();
-    const target = transactions.find((item) => item.checkoutRequestId === checkoutRequestId);
-    if (!target) return null;
-
-    if (target.status === 'expired') {
-      return target;
+      await model.deleteMany({
+        status: { $in: ['completed', 'failed', 'cancelled', 'expired'] },
+        completedAt: { $lt: cutoffDate },
+      });
+    } catch (error) {
+      console.error('[MpesaTransaction.purgeStaleTransactions] Error:', error.message);
     }
-
-    Object.assign(target, patch);
-    target.updatedAt = new Date();
-
-    if (patch.status && ['completed', 'failed', 'cancelled', 'expired'].includes(patch.status)) {
-      target.completedAt = new Date();
-    }
-
-    writeStore(transactions);
-    return target;
-  }
-
-  static async findLastByUserId(userId) {
-    if (!userId) return null;
-    MpesaTransaction.purgeStaleTransactions();
-
-    const transactions = transactionList();
-    let lastTransaction = null;
-    let latestTime = 0;
-
-    for (const transaction of transactions) {
-      if (transaction && transaction.userId === userId) {
-        const txTime = new Date(transaction.createdAt).getTime();
-        if (txTime > latestTime) {
-          latestTime = txTime;
-          lastTransaction = transaction;
-        }
-      }
-    }
-
-    return lastTransaction ? MpesaTransaction.expireIfPending(lastTransaction) : null;
-  }
-
-  static async getAllByUserId(userId) {
-    if (!userId) return [];
-    MpesaTransaction.purgeStaleTransactions();
-
-    const userTransactions = transactionList().filter((transaction) => transaction && transaction.userId === userId);
-
-    return userTransactions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   }
 }
 

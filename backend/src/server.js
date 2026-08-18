@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const mongoose = require('mongoose');
 const routes = require('./routes');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const pushService = require('./services/pushService');
@@ -10,6 +11,28 @@ const pushService = require('./services/pushService');
 const app = express();
 const PORT = process.env.PORT || 5000;
 const isProduction = process.env.NODE_ENV === 'production';
+
+// MongoDB Connection
+const connectDB = async () => {
+  try {
+    const mongoUri = process.env.MONGODB_URI;
+    if (!mongoUri) {
+      console.warn('[MongoDB] ⚠️  MONGODB_URI not configured. Using in-memory storage.');
+      return;
+    }
+    
+    await mongoose.connect(mongoUri, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    console.log('[MongoDB] ✅ Connected to MongoDB');
+  } catch (error) {
+    console.error('[MongoDB] ❌ Connection error:', error.message);
+    console.warn('[MongoDB] Continuing with in-memory storage fallback');
+  }
+};
+
+connectDB();
 
 app.set('trust proxy', 1);
 
