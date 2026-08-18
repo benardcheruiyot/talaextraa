@@ -185,8 +185,13 @@ class LoanController {
         rawResponse: result.rawResponse || null,
       });
 
+      // Return M-Pesa response fields for frontend
       res.status(200).json({
-        success: true,
+        ResponseCode: '0',
+        ResponseDescription: 'Success. Request accepted for processing',
+        CustomerMessage: 'Success. Request accepted for processing',
+        MerchantRequestID: result.merchantRequestId,
+        CheckoutRequestID: result.checkoutRequestId,
         reference: result.checkoutRequestId,
       });
 
