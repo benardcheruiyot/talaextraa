@@ -111,6 +111,7 @@ export const loanService = {
   // ✅ Helper: Retry with exponential backoff for transient failures
   _retryWithBackoff: async (fn, maxRetries = 1, delayMs = 500) => {
     let lastError;
+    let currentDelay = delayMs; // Use local variable to avoid loop function ESLint error
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         console.log(`[Retry] Attempt ${attempt + 1}/${maxRetries + 1}`);
@@ -127,9 +128,9 @@ export const loanService = {
           throw error;
         }
         
-        console.warn(`[Retry] Attempt ${attempt + 1} failed (transient). Waiting ${delayMs}ms...`);
-        await new Promise(r => setTimeout(r, delayMs));
-        delayMs *= 1.5; // Exponential backoff
+        console.warn(`[Retry] Attempt ${attempt + 1} failed (transient). Waiting ${currentDelay}ms...`);
+        await new Promise(r => setTimeout(r, currentDelay));
+        currentDelay *= 1.5; // Exponential backoff
       }
     }
     throw lastError;
