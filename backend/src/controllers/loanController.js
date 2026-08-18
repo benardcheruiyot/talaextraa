@@ -203,18 +203,30 @@ class LoanController {
       const inFlightRequest = stkRequestsInFlight.get(userId);
       if (inFlightRequest) {
         const timeSinceRequest = Date.now() - inFlightRequest.timestamp;
-        
-        // Block IMMEDIATE duplicates (within 2 seconds = definite double-click)
+
         if (timeSinceRequest < 2000) {
-          console.warn('[STK Push] IMMEDIATE DUPLICATE BLOCKED - Within 2 seconds. Last request:', {
+          console.warn('[STK Push] Active request already exists for user. Resuming it instead of failing.', {
             timestamp: inFlightRequest.timestamp,
             timeSinceRequest,
-            checkoutId: inFlightRequest.checkoutRequestId
+            checkoutId: inFlightRequest.checkoutRequestId,
           });
-          return next(new AppError('Please wait a moment before trying again.', 429));
+
+          const existingCheckoutId = inFlightRequest.checkoutRequestId;
+          const existingStatus = existingCheckoutId && existingCheckoutId !== 'PENDING' ? 'pending' : 'initiated';
+
+          return res.status(200).json({
+            success: true,
+            status: existingStatus,
+            activeRequest: true,
+            ResponseCode: '0',
+            ResponseDescription: 'A payment request is already active for this user.',
+            CustomerMessage: 'A payment request is already active. Continuing with the current request.',
+            MerchantRequestID: null,
+            CheckoutRequestID: existingCheckoutId,
+            reference: existingCheckoutId,
+          });
         }
-        
-        // 2+ seconds have passed - allow retry and delete old lock
+
         console.log('[STK Push] Previous request is 2+ seconds old - allowing retry. Cleaning up old lock.');
         stkRequestsInFlight.delete(userId);
       }

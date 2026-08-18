@@ -386,33 +386,54 @@ const Loan = () => {
       console.log('[Loan] STK Push result:', result);
       console.log('[Loan] Checking ResponseCode:', result?.ResponseCode);
 
-      // Check if STK push was successful (ResponseCode '0' = success)
+      // Check if STK push is active or successful. We intentionally resume an active request instead of failing.
       if (!result?.ResponseCode || result.ResponseCode !== '0') {
         const errorMsg = result?.CustomerMessage || result?.message || 'Failed to initiate payment';
         console.error('[Loan] STK Push failed:', errorMsg);
         throw new Error(errorMsg);
       }
 
-      console.log('[Loan] STK Push succeeded, checking out with:', result.CheckoutRequestID);
+      if (result?.activeRequest) {
+        console.log('[Loan] Active payment request resumed:', result.CheckoutRequestID);
+        Swal.fire({
+          title: 'Resuming Payment',
+          html: `
+            <div class="stk-modal-content">
+              <div class="stk-spinner" aria-hidden="true"></div>
+              <p class="stk-instruction">A secure M-Pesa request is already in progress. We are continuing the active payment check.</p>
+              <div class="stk-status-pill">Amount: ${formatCurrency(selectedLoan.fee)}</div>
+              <p class="stk-progress-note">Waiting for payment confirmation...</p>
+            </div>
+          `,
+          customClass: {
+            popup: 'stk-modal',
+          },
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          allowEscapeKey: false,
+        });
+      } else {
+        Swal.fire({
+          title: 'STK Push Sent',
+          html: `
+            <div class="stk-modal-content">
+              <div class="stk-spinner" aria-hidden="true"></div>
+              <p class="stk-instruction">Enter your M-Pesa PIN on your phone to approve payment.</p>
+              <div class="stk-status-pill">Amount: ${formatCurrency(selectedLoan.fee)}</div>
+              <p class="stk-progress-note">Waiting for payment confirmation...</p>
+              <p class="stk-progress-sub" id="stkAttemptHint">This usually takes less than 60 seconds.</p>
+            </div>
+          `,
+          customClass: {
+            popup: 'stk-modal',
+          },
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          allowEscapeKey: false,
+        });
+      }
 
-      Swal.fire({
-        title: 'STK Push Sent',
-        html: `
-          <div class="stk-modal-content">
-            <div class="stk-spinner" aria-hidden="true"></div>
-            <p class="stk-instruction">Enter your M-Pesa PIN on your phone to approve payment.</p>
-            <div class="stk-status-pill">Amount: ${formatCurrency(selectedLoan.fee)}</div>
-            <p class="stk-progress-note">Waiting for payment confirmation...</p>
-            <p class="stk-progress-sub" id="stkAttemptHint">This usually takes less than 60 seconds.</p>
-          </div>
-        `,
-        customClass: {
-          popup: 'stk-modal',
-        },
-        showConfirmButton: false,
-        allowOutsideClick: false,
-        allowEscapeKey: false,
-      });
+      console.log('[Loan] STK Push succeeded, checking out with:', result.CheckoutRequestID);
 
       let attempts = 0;
       let checkoutReference = result.CheckoutRequestID;  // Get from M-Pesa response

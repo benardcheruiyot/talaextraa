@@ -206,7 +206,7 @@ export const loanService = {
         },
       });
       console.log('[Active Payment] Response:', response.data);
-      return response.data;
+      return response.data?.data || null;
     } catch (error) {
       console.error('[Active Payment] Error:', error.message);
       return null; // Return null if no active request exists
