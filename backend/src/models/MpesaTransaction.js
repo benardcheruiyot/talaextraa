@@ -85,6 +85,17 @@ class MpesaTransaction {
     this.updatedAt = new Date();
   }
 
+  static getStatusFromResultCode(resultCode) {
+    const code = String(resultCode ?? '').trim();
+
+    if (code === '0') return 'completed';
+    if (code === '1032') return 'cancelled';
+    if (code === '1037') return 'expired';
+    if (code === '1' || code === '1019') return 'pending';
+
+    return 'failed';
+  }
+
   static async create(data) {
     try {
       const txnList = transactionsFromStore();

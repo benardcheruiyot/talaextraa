@@ -32,4 +32,13 @@ describe('MpesaTransaction persistence', () => {
     expect(persistedTransaction.checkoutRequestId).toBe('TX-123');
     expect(persistedTransaction.userId).toBe('user-1');
   });
+
+  it('detects completed, cancelled and timed-out payment states from result codes', () => {
+    const MpesaTransaction = require('./MpesaTransaction');
+
+    expect(MpesaTransaction.getStatusFromResultCode('0')).toBe('completed');
+    expect(MpesaTransaction.getStatusFromResultCode('1032')).toBe('cancelled');
+    expect(MpesaTransaction.getStatusFromResultCode('1037')).toBe('expired');
+    expect(MpesaTransaction.getStatusFromResultCode('500')).toBe('failed');
+  });
 });

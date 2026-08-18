@@ -524,7 +524,8 @@ class MpesaService {
 
       const normalizedResultCode = String(response.ResultCode || '');
       const isSuccess = normalizedResultCode === '0';
-      const isPending = ['1', '1037', '1019'].includes(String(response.ResultCode || ''));
+      const isPending = ['1', '1019'].includes(normalizedResultCode);
+      const isTimeout = normalizedResultCode === '1037';
       const isCancelled = normalizedResultCode === '1032';
       const mismatchDetected = !isSuccess && this.isAgentStoreMismatchDescription(response.ResultDesc);
 
@@ -541,6 +542,7 @@ class MpesaService {
       let normalizedStatus = 'failed';
       if (isSuccess) normalizedStatus = 'completed';
       else if (isCancelled) normalizedStatus = 'cancelled';
+      else if (isTimeout) normalizedStatus = 'expired';
       else if (isPending) normalizedStatus = 'pending';
 
       console.log(`[M-Pesa Status] Result: status=${normalizedStatus}, code=${response.ResultCode}, desc=${response.ResultDesc}`);

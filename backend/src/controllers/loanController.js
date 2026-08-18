@@ -495,12 +495,7 @@ class LoanController {
       const getMetaValue = (name) => metadata.find((item) => item.Name === name)?.Value;
       const receiptNumber = getMetaValue('MpesaReceiptNumber') || null;
 
-      const normalizedStatus =
-        normalizedResultCode === '0'
-          ? 'completed'
-          : normalizedResultCode === '1032'
-            ? 'cancelled'
-            : 'failed';
+      const normalizedStatus = MpesaTransaction.getStatusFromResultCode(normalizedResultCode);
 
       // Check if transaction exists
       let existingTransaction = await MpesaTransaction.findByCheckoutRequestId(CheckoutRequestID);
