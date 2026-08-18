@@ -30,10 +30,24 @@ const userSchema = new mongoose.Schema(
   }
 );
 
+// Register model once
+let UserModel = null;
+
+const getModel = () => {
+  if (!UserModel) {
+    if (mongoose.models.User) {
+      UserModel = mongoose.models.User;
+    } else {
+      UserModel = mongoose.model('User', userSchema);
+    }
+  }
+  return UserModel;
+};
+
 class User {
   static async create(data) {
     try {
-      const model = mongoose.model('User', userSchema);
+      const model = getModel();
       const hashedPassword = await bcrypt.hash(data.password, 10);
       const user = new model({
         ...data,
@@ -48,7 +62,7 @@ class User {
 
   static async findByPhone(phone) {
     try {
-      const model = mongoose.model('User', userSchema);
+      const model = getModel();
       return await model.findOne({ phone_number: phone });
     } catch (error) {
       console.error('[User.findByPhone] Error:', error.message);
@@ -58,7 +72,7 @@ class User {
 
   static async findById(id) {
     try {
-      const model = mongoose.model('User', userSchema);
+      const model = getModel();
       return await model.findById(id);
     } catch (error) {
       console.error('[User.findById] Error:', error.message);

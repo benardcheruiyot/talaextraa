@@ -60,10 +60,24 @@ mpesaTransactionSchema.index(
   }
 );
 
+// Register model once
+let MpesaTransactionModel = null;
+
+const getModel = () => {
+  if (!MpesaTransactionModel) {
+    if (mongoose.models.MpesaTransaction) {
+      MpesaTransactionModel = mongoose.models.MpesaTransaction;
+    } else {
+      MpesaTransactionModel = mongoose.model('MpesaTransaction', mpesaTransactionSchema);
+    }
+  }
+  return MpesaTransactionModel;
+};
+
 class MpesaTransaction {
   static async create(data) {
     try {
-      const model = mongoose.model('MpesaTransaction', mpesaTransactionSchema);
+      const model = getModel();
       const transaction = new model(data);
       return await transaction.save();
     } catch (error) {
@@ -75,7 +89,7 @@ class MpesaTransaction {
   static async findByCheckoutRequestId(checkoutRequestId) {
     try {
       if (!checkoutRequestId) return null;
-      const model = mongoose.model('MpesaTransaction', mpesaTransactionSchema);
+      const model = getModel();
       const transaction = await model.findOne({ checkoutRequestId });
       return transaction ? this.expireIfPending(transaction) : null;
     } catch (error) {
@@ -87,7 +101,7 @@ class MpesaTransaction {
   static async updateByCheckoutRequestId(checkoutRequestId, patch) {
     try {
       if (!checkoutRequestId) return null;
-      const model = mongoose.model('MpesaTransaction', mpesaTransactionSchema);
+      const model = getModel();
 
       const transaction = await model.findOne({ checkoutRequestId });
       if (!transaction) return null;
@@ -113,7 +127,7 @@ class MpesaTransaction {
   static async findLastByUserId(userId) {
     try {
       if (!userId) return null;
-      const model = mongoose.model('MpesaTransaction', mpesaTransactionSchema);
+      const model = getModel();
       const transaction = await model.findOne({ userId }).sort({ createdAt: -1 });
 
       return transaction ? this.expireIfPending(transaction) : null;
@@ -126,7 +140,7 @@ class MpesaTransaction {
   static async getAllByUserId(userId) {
     try {
       if (!userId) return [];
-      const model = mongoose.model('MpesaTransaction', mpesaTransactionSchema);
+      const model = getModel();
       return await model.find({ userId }).sort({ createdAt: -1 });
     } catch (error) {
       console.error('[MpesaTransaction.getAllByUserId] Error:', error.message);

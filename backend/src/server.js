@@ -12,27 +12,52 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const isProduction = process.env.NODE_ENV === 'production';
 
-// MongoDB Connection
+// MongoDB Connection with retry logic
 const connectDB = async () => {
   try {
     const mongoUri = process.env.MONGODB_URI;
     if (!mongoUri) {
-      console.warn('[MongoDB] ⚠️  MONGODB_URI not configured. Using in-memory storage.');
-      return;
+      console.warn('[MongoDB] ⚠️  MONGODB_URI not configured.');
+      return false;
     }
     
+    console.log('[MongoDB] Attempting connection...');
     await mongoose.connect(mongoUri, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      connectTimeoutMS: 10000,
+      retryWrites: true,
+      retryReads: true,
     });
-    console.log('[MongoDB] ✅ Connected to MongoDB');
+    console.log('[MongoDB] ✅ Connected successfully');
+    return true;
   } catch (error) {
-    console.error('[MongoDB] ❌ Connection error:', error.message);
-    console.warn('[MongoDB] Continuing with in-memory storage fallback');
+    console.error('[MongoDB] ❌ Connection failed:', error.message);
+    console.log('[MongoDB] Will retry connection...');
+    return false;
   }
 };
 
-connectDB();
+// Start connection (async, will retry in background)
+let mongoReady = false;
+connectDB().then(success => {
+  mongoReady = success;
+  if (success) {
+    console.log('[MongoDB] Ready for operations');
+  } else {
+    // Retry after 5 seconds
+    setTimeout(() => {
+      connectDB().then(success => {
+        mongoReady = success;
+        if (success) {
+          console.log('[MongoDB] Reconnected after retry');
+        }
+      });
+    }, 5000);
+  }
+});
 
 app.set('trust proxy', 1);
 

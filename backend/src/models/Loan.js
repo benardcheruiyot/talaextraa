@@ -44,10 +44,24 @@ const loanSchema = new mongoose.Schema(
   }
 );
 
+// Register model once
+let LoanModel = null;
+
+const getModel = () => {
+  if (!LoanModel) {
+    if (mongoose.models.Loan) {
+      LoanModel = mongoose.models.Loan;
+    } else {
+      LoanModel = mongoose.model('Loan', loanSchema);
+    }
+  }
+  return LoanModel;
+};
+
 class Loan {
   static async create(data) {
     try {
-      const model = mongoose.model('Loan', loanSchema);
+      const model = getModel();
       const loan = new model(data);
       return await loan.save();
     } catch (error) {
@@ -58,7 +72,7 @@ class Loan {
 
   static async findById(id) {
     try {
-      const model = mongoose.model('Loan', loanSchema);
+      const model = getModel();
       return await model.findById(id);
     } catch (error) {
       console.error('[Loan.findById] Error:', error.message);
@@ -69,7 +83,7 @@ class Loan {
   static async findByUserId(userId) {
     try {
       if (!userId) return [];
-      const model = mongoose.model('Loan', loanSchema);
+      const model = getModel();
       return await model.find({ userId });
     } catch (error) {
       console.error('[Loan.findByUserId] Error:', error.message);
@@ -79,7 +93,7 @@ class Loan {
 
   static async updateStatus(loanId, status, paymentReference) {
     try {
-      const model = mongoose.model('Loan', loanSchema);
+      const model = getModel();
       const loan = await model.findById(loanId);
 
       if (!loan) return null;
