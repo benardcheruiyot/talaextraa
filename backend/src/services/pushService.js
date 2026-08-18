@@ -148,6 +148,10 @@ async function broadcastHourlyReminder() {
     icon: '/favicon.ico',
     badge: '/favicon.ico',
     url: appUrl,
+    actions: [
+      { action: 'open', title: 'Open app' },
+      { action: 'dismiss', title: 'Dismiss' },
+    ],
   };
 
   const stale = [];
