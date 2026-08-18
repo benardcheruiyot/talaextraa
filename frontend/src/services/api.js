@@ -117,6 +117,15 @@ export const loanService = {
         return await fn();
       } catch (error) {
         lastError = error;
+
+        const isDuplicateRequest =
+          error.response?.status === 429 ||
+          error.message?.includes('Please wait a moment before trying again');
+
+        if (isDuplicateRequest) {
+          throw error;
+        }
+
         const isTransient = 
           error.code === 'ECONNABORTED' || // Timeout
           error.code === 'ECONNRESET' ||   // Connection reset
