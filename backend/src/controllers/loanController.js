@@ -9,6 +9,9 @@ const pushService = require('../services/pushService');
 const STATUS_QUERY_MIN_INTERVAL_MS = 1200;
 const TERMINAL_STATUS_GRACE_MS = 25000;
 
+// 🔐 In-memory lock tracking STK requests in-flight per user
+const stkRequestsInFlight = new Map(); // userId -> { timestamp, checkoutRequestId }
+
 class LoanController {
   constructor() {
     this.createApplication = this.createApplication.bind(this);
@@ -155,19 +158,30 @@ class LoanController {
   async initiateStkPush(req, res, next) {
     try {
       const { phone, amount, loanAmount, termDays } = req.body;
+      const userId = req.user?.id;
 
-      console.log('[STK Push] Request received:', { phone, amount, loanAmount, termDays, userId: req.user?.id });
+      console.log('[STK Push] Request received:', { phone, amount, loanAmount, termDays, userId });
 
       if (!phone || !amount) {
         console.error('[STK Push] Missing phone or amount');
         return next(new AppError('Phone number and amount are required', 400));
       }
 
-      // 🔐 Check for duplicate/recent active STK requests from this user (30-second window)
-      const hasActiveRequest = await MpesaTransaction.hasRecentActiveStkRequest(req.user.id, 30);
-      if (hasActiveRequest) {
-        console.warn('[STK Push] Duplicate request detected for user:', req.user.id);
-        return next(new AppError('You already have an active payment request. Please wait or check your phone for the M-Pesa prompt.', 429));
+      // 🔐 CRITICAL: Check in-memory lock for requests in-flight (catch duplicates IMMEDIATELY)
+      const inFlightRequest = stkRequestsInFlight.get(userId);
+      if (inFlightRequest) {
+        const timeSinceRequest = Date.now() - inFlightRequest.timestamp;
+        if (timeSinceRequest < 30000) { // 30-second window
+          console.warn('[STK Push] DUPLICATE REQUEST BLOCKED - User has request in-flight:', {
+            userId,
+            checkoutRequestId: inFlightRequest.checkoutRequestId,
+            timeSinceRequest,
+          });
+          return next(new AppError('You already have an active payment request. Please wait for confirmation or check your phone for the M-Pesa prompt.', 429));
+        } else {
+          // Cleanup expired entry
+          stkRequestsInFlight.delete(userId);
+        }
       }
 
       loanService.validateProcessingFee(Number(amount));
@@ -189,14 +203,22 @@ class LoanController {
 
       if (!result.success) {
         console.error('[STK Push] M-Pesa call failed:', result.message);
+        stkRequestsInFlight.delete(userId); // Release lock
         return next(new AppError(result.message, 400));
       }
+
+      // 🔐 Mark request as in-flight BEFORE database operation
+      stkRequestsInFlight.set(userId, {
+        timestamp: Date.now(),
+        checkoutRequestId: result.checkoutRequestId,
+      });
+      console.log('[STK Push] Marked request in-flight for user:', userId);
 
       console.log('[STK Push] Creating MpesaTransaction record');
       const txn = await MpesaTransaction.create({
         checkoutRequestId: result.checkoutRequestId,
         merchantRequestId: result.merchantRequestId,
-        userId: req.user.id,
+        userId: userId,
         phone,
         amount,
         loanAmount: resolvedLoanAmount,
@@ -222,14 +244,23 @@ class LoanController {
       res.status(200).json(responsePayload);
 
       // Notify device that STK push was sent
-      pushService.sendToUser(req.user.id, {
+      pushService.sendToUser(userId, {
         title: 'Check Your Phone',
         body: `M-Pesa payment request of KES ${amount} sent. Enter your PIN to confirm.`,
         icon: '/favicon.ico',
         url: this.appUrl,
       }).catch((err) => console.error('[Push Notification Error]:', err.message));
+
+      // Clean up lock after 2 minutes (callback should have arrived by then)
+      setTimeout(() => {
+        if (stkRequestsInFlight.get(userId)?.checkoutRequestId === result.checkoutRequestId) {
+          console.log('[STK Push] Auto-cleaning in-flight request for user:', userId);
+          stkRequestsInFlight.delete(userId);
+        }
+      }, 2 * 60 * 1000);
     } catch (error) {
       console.error('[STK Push] Exception caught:', error.message, error.stack);
+      stkRequestsInFlight.delete(req.user?.id); // Release lock on error
       next(new AppError(error.message, 400));
     }
   }
@@ -266,6 +297,12 @@ class LoanController {
       // when an STK query response is delayed or temporarily inconsistent.
       if (existingTransaction && terminalStatuses.includes(existingTransaction.status)) {
         console.log(`[Payment Status] Transaction already in terminal state: ${existingTransaction.status}`);
+        
+        // 🔐 Release lock on terminal state
+        if (existingTransaction?.userId) {
+          stkRequestsInFlight.delete(existingTransaction.userId);
+        }
+        
         const finalizedTransaction =
           existingTransaction.status === 'completed'
             ? await this.ensureLoanCreatedForCompletedTransaction(checkoutId)
@@ -361,6 +398,11 @@ class LoanController {
         `[Check Status] Final response: success=${normalizedStatus === 'completed'}, status=${normalizedStatus}`
       );
 
+      // 🔐 Release lock on terminal state
+      if (terminalStatuses.includes(normalizedStatus) && existingTransaction?.userId) {
+        stkRequestsInFlight.delete(existingTransaction.userId);
+      }
+
       res.status(200).json({
         success: normalizedStatus === 'completed',
         status: normalizedStatus,
@@ -448,6 +490,7 @@ class LoanController {
         // Notify user's device
         const userId = existingTransaction?.userId || finalTx?.userId;
         if (userId) {
+          stkRequestsInFlight.delete(userId); // 🔐 Release lock on success
           pushService.sendToUser(userId, {
             title: 'Payment Received!',
             body: 'Your M-Pesa payment was confirmed. Your loan is being processed.',
@@ -456,6 +499,11 @@ class LoanController {
           }).catch(() => {});
         }
       } else {
+        // 🔐 Release lock on failure too
+        const userId = existingTransaction?.userId;
+        if (userId) {
+          stkRequestsInFlight.delete(userId);
+        }
         console.log(`Payment failed for request: ${CheckoutRequestID}, Result: ${ResultDesc}`);
       }
 
