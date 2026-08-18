@@ -191,6 +191,15 @@ class LoanController {
         loanService.validateLoanAmount(Number(resolvedLoanAmount));
       }
 
+      // 🔐 SET LOCK BEFORE calling M-Pesa to prevent concurrent duplicates
+      // Use a placeholder value that will be updated after M-Pesa responds
+      const lockTimestamp = Date.now();
+      stkRequestsInFlight.set(userId, {
+        timestamp: lockTimestamp,
+        checkoutRequestId: 'PENDING', // Placeholder
+      });
+      console.log('[STK Push] ⚙️ LOCK SET - About to call M-Pesa for user:', userId);
+
       console.log('[STK Push] Calling mpesaService.initiateStkPush');
       const result = await mpesaService.initiateStkPush(phone, amount);
       
@@ -203,16 +212,16 @@ class LoanController {
 
       if (!result.success) {
         console.error('[STK Push] M-Pesa call failed:', result.message);
-        stkRequestsInFlight.delete(userId); // Release lock
+        stkRequestsInFlight.delete(userId); // 🔓 Release lock
         return next(new AppError(result.message, 400));
       }
 
-      // 🔐 Mark request as in-flight BEFORE database operation
+      // 🔐 UPDATE lock with actual checkoutRequestId from M-Pesa
       stkRequestsInFlight.set(userId, {
-        timestamp: Date.now(),
+        timestamp: lockTimestamp,
         checkoutRequestId: result.checkoutRequestId,
       });
-      console.log('[STK Push] Marked request in-flight for user:', userId);
+      console.log('[STK Push] ✓ Lock updated with checkout ID:', result.checkoutRequestId);
 
       console.log('[STK Push] Creating MpesaTransaction record');
       const txn = await MpesaTransaction.create({
