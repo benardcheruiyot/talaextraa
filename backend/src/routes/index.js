@@ -22,10 +22,15 @@ router.get('/loans', protect, loanController.getUserLoans);
 router.get('/loans/last', protect, loanController.getLastTransaction);
 router.get('/loans/:loanId', protect, loanController.getLoan);
 
-// Payment routes
+// Payment routes (both old and new naming for compatibility)
 router.post('/stk_push', protect, loanController.initiateStkPush);
 router.get('/check_status', protect, loanController.checkPaymentStatus);
 router.post('/mpesa/callback', loanController.handleMpesaCallback);
+
+// Payment routes (new naming)
+router.post('/payments/initiate', protect, loanController.initiateStkPush);
+router.get('/payments/status', protect, loanController.checkPaymentStatus);
+router.post('/payments/callback', loanController.handleMpesaCallback);
 
 // Web Push routes
 router.get('/push/vapid-key', (req, res) => {
