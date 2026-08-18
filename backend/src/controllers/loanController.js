@@ -350,10 +350,27 @@ class LoanController {
       }
 
       console.log('[Payment Status] Querying M-Pesa API for transaction status...');
-      const result = await mpesaService.checkTransactionStatus(checkoutId);
-      console.log('[Payment Status] M-Pesa query result:', result.status);
+      let result;
+      try {
+        result = await mpesaService.checkTransactionStatus(checkoutId);
+        console.log('[Payment Status] M-Pesa query result:', result.status);
+      } catch (mpesaError) {
+        console.error('[Payment Status] M-Pesa query failed:', mpesaError.message);
+        // M-Pesa API failed - return what we know from the transaction record
+        result = {
+          status: existingTransaction?.status || 'pending',
+          resultCode: existingTransaction?.resultCode || null,
+          resultDescription: existingTransaction?.resultDescription || null,
+        };
+      }
 
-      const refreshedTransaction = await MpesaTransaction.findByCheckoutRequestId(checkoutId);
+      let refreshedTransaction;
+      try {
+        refreshedTransaction = await MpesaTransaction.findByCheckoutRequestId(checkoutId);
+      } catch (findError) {
+        console.error('[Payment Status] Error refreshing transaction:', findError.message);
+        refreshedTransaction = existingTransaction;
+      }
       const fallbackStatus = refreshedTransaction?.status || existingTransaction?.status || 'pending';
       let normalizedStatus = result.status || fallbackStatus;
 
@@ -428,11 +445,12 @@ class LoanController {
       });
     } catch (error) {
       console.error('[Check Status] Error:', error.message, error.stack);
+      // Don't let backend errors crash - return status immediately
       return res.status(200).json({
         success: false,
         status: 'pending',
         resultCode: null,
-        resultDescription: 'Payment confirmation is delayed. Please keep waiting.',
+        resultDescription: 'Payment status check temporarily unavailable. Your payment status was recorded. Please try again in a moment.',
         loanId: null,
       });
     }
