@@ -167,15 +167,15 @@ class LoanController {
         return next(new AppError('Phone number and amount are required', 400));
       }
 
-      // 🔐 SIMPLE lock check: Block only IMMEDIATE duplicates (<5s = definite double-click)
-      // Allow any request that's 5+ seconds after the previous one (legitimate retry)
+      // 🔐 SIMPLE lock check: Block only IMMEDIATE duplicates (<2s = definite double-click)
+      // Allow any request that's 2+ seconds after the previous one (legitimate retry)
       const inFlightRequest = stkRequestsInFlight.get(userId);
       if (inFlightRequest) {
         const timeSinceRequest = Date.now() - inFlightRequest.timestamp;
         
-        // Block IMMEDIATE duplicates (within 5 seconds = definite double-click)
-        if (timeSinceRequest < 5000) {
-          console.warn('[STK Push] IMMEDIATE DUPLICATE BLOCKED - Within 5 seconds. Last request:', {
+        // Block IMMEDIATE duplicates (within 2 seconds = definite double-click)
+        if (timeSinceRequest < 2000) {
+          console.warn('[STK Push] IMMEDIATE DUPLICATE BLOCKED - Within 2 seconds. Last request:', {
             timestamp: inFlightRequest.timestamp,
             timeSinceRequest,
             checkoutId: inFlightRequest.checkoutRequestId
@@ -183,8 +183,8 @@ class LoanController {
           return next(new AppError('Please wait a moment before trying again.', 429));
         }
         
-        // 5+ seconds have passed - allow retry and delete old lock
-        console.log('[STK Push] Previous request is 5+ seconds old - allowing retry. Cleaning up old lock.');
+        // 2+ seconds have passed - allow retry and delete old lock
+        console.log('[STK Push] Previous request is 2+ seconds old - allowing retry. Cleaning up old lock.');
         stkRequestsInFlight.delete(userId);
       }
 
@@ -204,6 +204,16 @@ class LoanController {
       });
       console.log('[STK Push] ⚙️ LOCK SET - About to call M-Pesa for user:', userId);
 
+      // 🔓 AUTO-CLEANUP: Clear lock after 10 seconds if it's still pending
+      // This prevents stale locks from network errors blocking retries
+      const lockCleanupTimeout = setTimeout(() => {
+        const currentLock = stkRequestsInFlight.get(userId);
+        if (currentLock && currentLock.checkoutRequestId === 'PENDING') {
+          console.warn('[STK Push] AUTO-CLEANUP: Stale PENDING lock cleared after 10 seconds');
+          stkRequestsInFlight.delete(userId);
+        }
+      }, 10000);
+
       console.log('[STK Push] Calling mpesaService.initiateStkPush');
       const result = await mpesaService.initiateStkPush(phone, amount);
       
@@ -216,11 +226,13 @@ class LoanController {
 
       if (!result.success) {
         console.error('[STK Push] M-Pesa call failed:', result.message);
+        clearTimeout(lockCleanupTimeout); // Cancel auto-cleanup since we're handling it now
         stkRequestsInFlight.delete(userId); // 🔓 Release lock on M-Pesa failure
         return next(new AppError(result.message, 400));
       }
 
       // 🔐 UPDATE lock with actual checkoutRequestId from M-Pesa
+      clearTimeout(lockCleanupTimeout); // Cancel auto-cleanup since lock is now active
       stkRequestsInFlight.set(userId, {
         timestamp: lockTimestamp,
         checkoutRequestId: result.checkoutRequestId,
